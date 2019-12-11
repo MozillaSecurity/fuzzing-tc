@@ -1,0 +1,120 @@
+version: 1
+policy:
+  pullRequests: public
+tasks:
+  $let:
+    head_branch:
+      $if: 'tasks_for == "github-pull-request"'
+      then: ${event.pull_request.head.ref}
+      else:
+        $if: 'tasks_for == "github-push"'
+        then: ${event.ref}
+        else: ${event.release.target_commitish}
+
+    head_rev:
+      $if: 'tasks_for == "github-pull-request"'
+      then: ${event.pull_request.head.sha}
+      else:
+        $if: 'tasks_for == "github-push"'
+        then: ${event.after}
+        else: ${event.release.tag_name}
+
+    repository:
+      $if: 'tasks_for == "github-pull-request"'
+      then: ${event.pull_request.head.repo.html_url}
+      else: ${event.repository.html_url}
+
+    taskboot_image: "mozilla/taskboot:0.1.10"
+  in:
+    - taskId: {$eval: as_slugid("decision_lint")}
+      created: {$fromNow: ''}
+      deadline: {$fromNow: '1 hour'}
+      provisionerId: proj-fuzzing
+      workerType: ci
+      payload:
+        maxRunTime: 1200
+        image: python:3-slim
+        command:
+          - /bin/bash
+          - -cxe
+          - |
+            apt-get update -qq
+            apt-get install -qq git > /dev/null
+            git clone --quiet ${repository} /src
+            cd /src
+            git -c advice.detachedHead=false checkout ${head_rev}
+            pip install --disable-pip-version-check --no-cache-dir --quiet /src flake8
+            flake8 /src
+      metadata:
+        name: Fuzzing Taskcluster decision lint
+        description: Check that the source code from Decision task source code is nice & clean
+        owner: fuzzing+taskcluster@mozilla.com
+        source: https://github.com/MozillaSecurity/fuzzing-tc
+
+    - taskId: {$eval: as_slugid("decision_build")}
+      created: {$fromNow: ''}
+      deadline: {$fromNow: '1 hour'}
+      provisionerId: proj-fuzzing
+      workerType: ci
+      dependencies:
+        - {$eval: as_slugid("decision_lint")}
+      payload:
+        capabilities:
+          privileged: true
+        maxRunTime: 3600
+        image: "${taskboot_image}"
+        env:
+          GIT_REPOSITORY: ${repository}
+          GIT_REVISION: ${head_rev}
+        command:
+          - taskboot
+          - build
+          - --image
+          - mozillasecurity/fuzzing-tc
+          - --tag
+          - "latest"
+          - --tag
+          - "${head_rev}"
+          - --write
+          - /decision.tar
+          - Dockerfile
+        artifacts:
+          public/fuzzing-tc-decision.tar:
+            expires: {$fromNow: '2 weeks'}
+            path: /decision.tar
+            type: file
+      scopes:
+        - docker-worker:capability:privileged
+      metadata:
+        name: Fuzzing Taskcluster decision docker build
+        description: Build the docker image for decision tasks
+        owner: fuzzing+taskcluster@mozilla.com
+        source: https://github.com/MozillaSecurity/fuzzing-tc
+
+    - $if: 'head_branch == "refs/heads/master"'
+      then:
+        taskId: {$eval: as_slugid("decision_deploy")}
+        created: {$fromNow: ''}
+        deadline: {$fromNow: '1 hour'}
+        provisionerId: proj-fuzzing
+        workerType: ci
+        dependencies:
+          - {$eval: as_slugid("decision_build")}
+        payload:
+          features:
+            # Needed for access to secret
+            taskclusterProxy: true
+          maxRunTime: 3600
+          image: "${taskboot_image}"
+          env:
+            TASKCLUSTER_SECRET: "project/fuzzing/ci-fuzzing-tc"
+          command:
+            - taskboot
+            - push-artifact
+        scopes:
+          - "secrets:get:project/fuzzing/ci-fuzzing-tc"
+        metadata:
+          name: Fuzzing Taskcluster decision docker push
+          description: Push decision's docker image on repository
+          owner: fuzzing+taskcluster@mozilla.com
+          source: https://github.com/MozillaSecurity/fuzzing-tc
