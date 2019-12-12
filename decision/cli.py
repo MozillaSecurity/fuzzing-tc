@@ -35,7 +35,12 @@ def main():
     args = parse_cli()
     secrets = taskcluster.load_secrets(
         args.taskcluster_secret,
-        required=["config"],
+        required=["fuzzing_config"],
+        existing={
+            "community_config": {
+                "url": "git@github.com:mozilla/community-tc-config.git",
+            }
+        },
         local_secrets=yaml.safe_load(args.configuration)
         if args.configuration
         else None,
@@ -43,7 +48,7 @@ def main():
     assert args.task_group, "No task group specified"
 
     workflow = Workflow(args.task_group)
-    workflow.run(secrets["config"])
+    workflow.run(secrets)
 
 
 if __name__ == "__main__":
