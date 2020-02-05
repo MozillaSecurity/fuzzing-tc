@@ -1,18 +1,17 @@
 # -*- coding: utf-8 -*-
 import atexit
-import difflib
 import glob
-import json
 import logging
 import os
 import shutil
 import subprocess
 import tempfile
 
-from taskcluster import WorkerManager
-from taskcluster.exceptions import TaskclusterRestFailure
+import yaml
+from taskcluster import Secrets, optionsFromEnvironment
+from tcadmin.appconfig import AppConfig
 
-from decision import taskcluster
+from decision import HOOK_PREFIX, WORKER_POOL_PREFIX
 from decision.pool import MachineTypes, PoolConfiguration
 from decision.providers import AWS
 
@@ -22,19 +21,63 @@ logger = logging.getLogger()
 class Workflow(object):
     """Fuzzing decision task workflow"""
 
-    def __init__(self, task_group_id):
+    def __init__(self):
         self.fuzzing_config_dir = None
         self.community_config_dir = None
-        self.task_group_id = task_group_id
-        self.queue = taskcluster.get_service("queue")
-        logger.info(f"Running decision from group {self.task_group_id}")
-
-        self.worker_manager = WorkerManager(taskcluster.options)
 
         # Automatic cleanup at end of execution
         atexit.register(self.cleanup)
 
-    def run(self, config):
+    @staticmethod
+    async def tc_admin_boot(resources):
+        """Setup the workflow to be usable by tc-admin"""
+        appconfig = AppConfig.current()
+
+        # Configure workflow using tc-admin options
+        workflow = Workflow()
+        config = workflow.configure(
+            local_path=appconfig.options.get("fuzzing_configuration"),
+            secret=appconfig.options.get("fuzzing_taskcluster_secret"),
+        )
+
+        # Retrieve remote repositories
+        workflow.clone(config)
+
+        # Then generate all our Taskcluster resources
+        workflow.generate(resources)
+
+    def configure(self, local_path=None, secret=None):
+        """Load configuration either from local file or Taskcluster secret"""
+
+        if local_path is not None:
+            assert os.path.exists(local_path), f"Missing configuration in {local_path}"
+            config = yaml.safe_load(open(local_path))
+
+        elif secret is not None:
+            # Use Proxy when available
+            tc_options = optionsFromEnvironment()
+            if "TASKCLUSTER_PROXY_URL" in os.environ:
+                tc_options["rootUrl"] = os.environ["TASKCLUSTER_PROXY_URL"]
+            secrets = Secrets(tc_options)
+            response = secrets.get(secret)
+            assert response is not None, "Invalid Taskcluster secret payload"
+            config = response["secret"]
+        else:
+            raise Exception("Specify local_path XOR secret")
+
+        assert isinstance(config, dict)
+        assert "fuzzing_config" in config, "Missing fuzzing_config"
+        if "community_config" not in config:
+            config["community_config"] = {
+                "url": "git@github.com:mozilla/community-tc-config.git"
+            }
+
+        # TODO: detect Github repos + revisions
+
+        return config
+
+    def clone(self, config):
+        """Clone remote repositories according to current setup"""
         assert isinstance(config, dict)
 
         # Setup ssh private key if any
@@ -48,8 +91,15 @@ class Workflow(object):
             logger.info("Installed ssh private key")
 
         # Clone fuzzing & community configuration repos
-        self.fuzzing_config_dir = self.clone(**config["fuzzing_config"])
-        self.community_config_dir = self.clone(**config["community_config"])
+        self.fuzzing_config_dir = self.git_clone(**config["fuzzing_config"])
+        self.community_config_dir = self.git_clone(**config["community_config"])
+
+    def generate(self, resources):
+
+        # Setup resources manager to track only fuzzing instances
+        patterns = [rf"WorkerPool={WORKER_POOL_PREFIX}/.*", rf"Hook={HOOK_PREFIX}/.*"]
+        for pattern in patterns:
+            resources.manage(pattern)
 
         # Load the AWS configuration from community config
         aws = AWS(self.community_config_dir)
@@ -63,29 +113,13 @@ class Workflow(object):
         fuzzing_glob = os.path.join(self.fuzzing_config_dir, "pool*.yml")
         for config_file in glob.glob(fuzzing_glob):
 
-            pool = PoolConfiguration.from_file(config_file)
+            pool_config = PoolConfiguration.from_file(config_file)
 
-            # Dump it as json
-            payload = pool.build_payload(aws, machines)
+            pool = pool_config.build_resource(aws, machines)
 
-            # Retrieve the existing one
-            try:
-                existing = self.worker_manager.workerPool(pool.id)
-            except TaskclusterRestFailure as e:
-                if e.status_code == 404:
-                    logger.info(f"Worker pool {pool.id} does not exist")
-                    existing = None
-                else:
-                    raise
+            resources.add(pool)
 
-            diff = self.diff(existing, payload)
-            if diff is None:
-                logger.info(f"No changes for {pool.id}")
-            else:
-                logger.info(f"Changes need to be applied on {pool.id}")
-                print(diff)
-
-    def clone(self, url=None, path=None, **kwargs):
+    def git_clone(self, url=None, path=None, **kwargs):
         """Clone a configuration repository"""
         if path is not None:
             # Use local path when available
@@ -106,19 +140,6 @@ class Workflow(object):
             return clone_dir
         else:
             raise Exception("You need to specify a repo url or local path")
-
-    def diff(self, existing, generated):
-        """Compare two dict payloads using unidiff"""
-        diff = difflib.unified_diff(
-            json.dumps(existing, sort_keys=True, indent=4).splitlines(),
-            json.dumps(generated, sort_keys=True, indent=4).splitlines(),
-            fromfile="existing.json",
-            tofile="generated.json",
-        )
-        diff_lines = list(diff)
-        if not diff_lines:
-            return None
-        return "\n".join(diff_lines)
 
     def cleanup(self):
         """Cleanup temporary folders at end of execution"""

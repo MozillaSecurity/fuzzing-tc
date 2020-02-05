@@ -3,6 +3,7 @@ import os
 import re
 
 import yaml
+from tcadmin.resources import WorkerPool
 
 from decision import OWNER_EMAIL, WORKER_POOL_PREFIX
 
@@ -239,48 +240,50 @@ class PoolConfiguration:
             cpus = machine_types.cpus(self.cloud, self.cpu, machine)
             yield (machine, cpus // self.cores_per_task)
 
-    def build_payload(self, provider, machine_types):
-        """Build the full Taskcluster payload to compare and build the pool"""
+    def build_resource(self, provider, machine_types):
+        """Build the full tc-admin resource to compare and build the pool"""
 
         # Load the AWS infos for that imageset
         amis = provider.get_amis(self.imageset)
         worker_config = provider.get_worker_config(self.imageset)
         machines = self.get_machine_list(machine_types)
 
-        return {
-            "workerPoolId": self.id,
-            "providerId": f"community-tc-workers-{self.cloud}",
-            "description": DESCRIPTION,
-            "config": {
-                "minCapacity": 0,
-                "maxCapacity": self.tasks,
-                "launchConfigs": [
-                    {
-                        "capacityPerInstance": capacity,
-                        "region": region_name,
-                        "launchConfig": {
-                            "ImageId": amis[region_name],
-                            "Placement": {"AvailabilityZone": az},
-                            "SubnetId": az,
-                            "SecurityGroupIds": [
-                                # Always use the no-inbound sec group
-                                region["security_groups"]["no-inbound"]
-                            ],
-                            "InstanceType": instance,
-                            # Always use spot instances
-                            "InstanceMarketOptions": {"MarketType": "spot"},
-                        },
-                        "workerConfig": worker_config,
-                    }
-                    for instance, capacity in machines
-                    for region_name, region in provider.regions.items()
-                    for az, subnet in region["subnets"].items()
-                    if region_name in amis
-                ],
-            },
-            "owner": OWNER_EMAIL,
-            "emailOnError": True,
+        config = {
+            "minCapacity": 0,
+            "maxCapacity": self.tasks,
+            "launchConfigs": [
+                {
+                    "capacityPerInstance": capacity,
+                    "region": region_name,
+                    "launchConfig": {
+                        "ImageId": amis[region_name],
+                        "Placement": {"AvailabilityZone": az},
+                        "SubnetId": az,
+                        "SecurityGroupIds": [
+                            # Always use the no-inbound sec group
+                            region["security_groups"]["no-inbound"]
+                        ],
+                        "InstanceType": instance,
+                        # Always use spot instances
+                        "InstanceMarketOptions": {"MarketType": "spot"},
+                    },
+                    "workerConfig": worker_config,
+                }
+                for instance, capacity in machines
+                for region_name, region in provider.regions.items()
+                for az, subnet in region["subnets"].items()
+                if region_name in amis
+            ],
         }
+
+        return WorkerPool(
+            workerPoolId=self.id,
+            providerId=f"community-tc-workers-{self.cloud}",
+            description=DESCRIPTION,
+            owner=OWNER_EMAIL,
+            emailOnError=True,
+            config=config,
+        )
 
     @classmethod
     def from_file(cls, pool_yml, _flattened=None):

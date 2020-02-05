@@ -1,2 +1,2 @@
 pyyaml==5.2
-taskcluster==24.1.0
+tc-admin==2.2.0

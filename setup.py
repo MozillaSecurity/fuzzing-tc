@@ -30,5 +30,4 @@ setuptools.setup(
     include_package_data=True,
     zip_safe=False,
     license="MPL2",
-    entry_points={"console_scripts": ["fuzzing-decision = decision.cli:main"]},
 )
