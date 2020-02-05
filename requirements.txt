@@ -1,2 +1,2 @@
-taskcluster==24.1.0
 pyyaml==5.2
+taskcluster==24.1.0

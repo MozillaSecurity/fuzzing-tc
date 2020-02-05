@@ -1,17 +1,20 @@
+# -*- coding: utf-8 -*-
+import atexit
+import difflib
+import glob
+import json
+import logging
+import os
+import shutil
+import subprocess
+import tempfile
+
+from taskcluster import WorkerManager
+from taskcluster.exceptions import TaskclusterRestFailure
+
 from decision import taskcluster
 from decision.pool import MachineTypes, PoolConfiguration
 from decision.providers import AWS
-from taskcluster import WorkerManager
-from taskcluster.exceptions import TaskclusterRestFailure
-import logging
-import json
-import difflib
-import tempfile
-import subprocess
-import atexit
-import shutil
-import glob
-import os
 
 logger = logging.getLogger()
 
@@ -38,8 +41,7 @@ class Workflow(object):
         private_key = config.get("private_key")
         if private_key is not None:
             path = os.path.expanduser("~/.ssh/id_rsa")
-            assert not os.path.exists(path), \
-                f"Existing ssh key found at {path}"
+            assert not os.path.exists(path), f"Existing ssh key found at {path}"
             with open(path, "w") as f:
                 f.write(private_key)
             os.chmod(path, 0o400)
@@ -53,7 +55,9 @@ class Workflow(object):
         aws = AWS(self.community_config_dir)
 
         # Load the machine types
-        machines = MachineTypes.from_file(os.path.join(self.fuzzing_config_dir, "machines.yml"))
+        machines = MachineTypes.from_file(
+            os.path.join(self.fuzzing_config_dir, "machines.yml")
+        )
 
         # Browse the files in the repo
         fuzzing_glob = os.path.join(self.fuzzing_config_dir, "pool*.yml")
@@ -91,16 +95,11 @@ class Workflow(object):
 
         elif url is not None:
             # Clone from remote repository
-            clone_dir = tempfile.mkdtemp(suffix=url[url.rindex("/")+1:])
+            clone_dir = tempfile.mkdtemp(suffix=url[url.rindex("/") + 1 :])
 
             # Clone the configuration repository
             logger.info(f"Cloning {url}")
-            cmd = [
-                "git", "clone",
-                "--quiet",
-                url,
-                clone_dir,
-            ]
+            cmd = ["git", "clone", "--quiet", url, clone_dir]
             subprocess.check_output(cmd)
             logger.info(f"Using cloned config files in {clone_dir}")
 
@@ -113,13 +112,13 @@ class Workflow(object):
         diff = difflib.unified_diff(
             json.dumps(existing, sort_keys=True, indent=4).splitlines(),
             json.dumps(generated, sort_keys=True, indent=4).splitlines(),
-            fromfile='existing.json',
-            tofile='generated.json',
+            fromfile="existing.json",
+            tofile="generated.json",
         )
         diff_lines = list(diff)
         if not diff_lines:
             return None
-        return '\n'.join(diff_lines)
+        return "\n".join(diff_lines)
 
     def cleanup(self):
         """Cleanup temporary folders at end of execution"""

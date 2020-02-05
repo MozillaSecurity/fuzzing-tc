@@ -33,7 +33,7 @@ tasks:
       workerType: ci
       payload:
         maxRunTime: 1200
-        image: python:3-slim
+        image: python:3.7-slim
         command:
           - /bin/bash
           - -cxe
@@ -43,8 +43,8 @@ tasks:
             git clone --quiet ${repository} /src
             cd /src
             git -c advice.detachedHead=false checkout ${head_rev}
-            pip install --disable-pip-version-check --no-cache-dir --quiet /src flake8
-            flake8 /src
+            pip install --disable-pip-version-check --no-cache-dir --quiet -r /src/tests-requirements.txt
+            pre-commit run -a
       metadata:
         name: Fuzzing Taskcluster decision lint
         description: Check that the source code from Decision task source code is nice & clean

@@ -1,6 +1,8 @@
-import yaml
-import os
+# -*- coding: utf-8 -*-
 import logging
+import os
+
+import yaml
 
 logger = logging.getLogger()
 
@@ -10,8 +12,10 @@ class AWS(object):
 
     def __init__(self, base_dir):
         # Load configuration from cloned community config
-        self.regions = self.load_regions(os.path.join(base_dir, 'config', 'aws.yml'))
-        self.imagesets = yaml.safe_load(open(os.path.join(base_dir, 'config', 'imagesets.yml')))
+        self.regions = self.load_regions(os.path.join(base_dir, "config", "aws.yml"))
+        self.imagesets = yaml.safe_load(
+            open(os.path.join(base_dir, "config", "imagesets.yml"))
+        )
         logger.info("Loaded AWS configuration")
 
     def load_regions(self, path):
@@ -19,7 +23,9 @@ class AWS(object):
         aws = yaml.safe_load(open(path))
         assert "subnets" in aws, "Missing subnets in AWS config"
         assert "security_groups" in aws, "Missing security_groups in AWS config"
-        assert aws["subnets"].keys() == aws["security_groups"].keys(), "Keys mismatch in AWS config"
+        assert (
+            aws["subnets"].keys() == aws["security_groups"].keys()
+        ), "Keys mismatch in AWS config"
         return {
             region: {
                 "subnets": subnets,
@@ -37,9 +43,11 @@ class AWS(object):
         out = self.imagesets[worker]["workerConfig"]
 
         # Fixed config for websocket tunnel
-        out.update({
-            "wstAudience": "communitytc",
-            "wstServerURL": "https://community-websocktunnel.services.mozilla.com",
-        })
+        out.update(
+            {
+                "wstAudience": "communitytc",
+                "wstServerURL": "https://community-websocktunnel.services.mozilla.com",
+            }
+        )
 
         return out

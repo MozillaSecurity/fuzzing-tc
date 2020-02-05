@@ -1,15 +1,16 @@
-import os
+# -*- coding: utf-8 -*-
 import argparse
+import os
+
+import yaml
+
 from decision import taskcluster
 from decision.workflow import Workflow
-import yaml
 
 
 def parse_cli():
     """Parse CLI arguments to build initial configuration"""
-    parser = argparse.ArgumentParser(
-        description="Mozilla Fuzzing Decision task"
-    )
+    parser = argparse.ArgumentParser(description="Mozilla Fuzzing Decision task")
     parser.add_argument(
         "-g",
         "--task-group",
@@ -38,7 +39,7 @@ def main():
         required=["fuzzing_config"],
         existing={
             "community_config": {
-                "url": "git@github.com:mozilla/community-tc-config.git",
+                "url": "git@github.com:mozilla/community-tc-config.git"
             }
         },
         local_secrets=yaml.safe_load(args.configuration)
