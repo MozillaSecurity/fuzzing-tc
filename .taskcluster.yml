@@ -51,6 +51,31 @@ tasks:
         owner: fuzzing+taskcluster@mozilla.com
         source: https://github.com/MozillaSecurity/fuzzing-tc
 
+    - taskId: {$eval: as_slugid("decision_tests")}
+      created: {$fromNow: ''}
+      deadline: {$fromNow: '1 hour'}
+      provisionerId: proj-fuzzing
+      workerType: ci
+      payload:
+        maxRunTime: 1200
+        image: python:3.7-slim
+        command:
+          - /bin/bash
+          - -cxe
+          - |
+            apt-get update -qq
+            apt-get install -qq git > /dev/null
+            git clone --quiet ${repository} /src
+            cd /src
+            git -c advice.detachedHead=false checkout ${head_rev}
+            pip install --disable-pip-version-check --no-cache-dir --quiet -r /src/tests-requirements.txt /src
+            pytest -v
+      metadata:
+        name: Fuzzing Taskcluster decision unit tests
+        description: Check that the unit tests from Decision tasks are valid
+        owner: fuzzing+taskcluster@mozilla.com
+        source: https://github.com/MozillaSecurity/fuzzing-tc
+
     - taskId: {$eval: as_slugid("decision_build")}
       created: {$fromNow: ''}
       deadline: {$fromNow: '1 hour'}
@@ -58,6 +83,7 @@ tasks:
       workerType: ci
       dependencies:
         - {$eval: as_slugid("decision_lint")}
+        - {$eval: as_slugid("decision_tests")}
       payload:
         capabilities:
           privileged: true
