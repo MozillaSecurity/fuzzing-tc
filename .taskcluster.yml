@@ -24,7 +24,7 @@ tasks:
       then: ${event.pull_request.head.repo.html_url}
       else: ${event.repository.html_url}
 
-    taskboot_image: "mozilla/taskboot:0.1.10"
+    taskboot_image: "mozilla/taskboot:0.2.2"
   in:
     - taskId: {$eval: as_slugid("decision_lint")}
       created: {$fromNow: ''}
@@ -85,8 +85,8 @@ tasks:
         - {$eval: as_slugid("decision_lint")}
         - {$eval: as_slugid("decision_tests")}
       payload:
-        capabilities:
-          privileged: true
+        features:
+          dind: true
         maxRunTime: 3600
         image: "${taskboot_image}"
         env:
@@ -95,6 +95,8 @@ tasks:
         command:
           - taskboot
           - build
+          - --build-tool
+          - dind
           - --image
           - mozillasecurity/fuzzing-tc
           - --tag
@@ -109,38 +111,16 @@ tasks:
             expires: {$fromNow: '2 weeks'}
             path: /decision.tar
             type: file
+      routes:
+        - "index.project.fuzzing.config.rev.${head_rev}"
+        - $if: 'tasks_for == "github-pull-request"'
+          then: "index.project.fuzzing.config.pull_request.${head_branch}"
+          else: "index.project.fuzzing.config.${head_branch}"
       scopes:
         - docker-worker:capability:privileged
+        - queue:route:index.project.fuzzing.config.*
       metadata:
         name: Fuzzing Taskcluster decision docker build
         description: Build the docker image for decision tasks
         owner: fuzzing+taskcluster@mozilla.com
         source: https://github.com/MozillaSecurity/fuzzing-tc
-
-    - $if: 'head_branch == "refs/heads/master"'
-      then:
-        taskId: {$eval: as_slugid("decision_deploy")}
-        created: {$fromNow: ''}
-        deadline: {$fromNow: '1 hour'}
-        provisionerId: proj-fuzzing
-        workerType: ci
-        dependencies:
-          - {$eval: as_slugid("decision_build")}
-        payload:
-          features:
-            # Needed for access to secret
-            taskclusterProxy: true
-          maxRunTime: 3600
-          image: "${taskboot_image}"
-          env:
-            TASKCLUSTER_SECRET: "project/fuzzing/ci-fuzzing-tc"
-          command:
-            - taskboot
-            - push-artifact
-        scopes:
-          - "secrets:get:project/fuzzing/ci-fuzzing-tc"
-        metadata:
-          name: Fuzzing Taskcluster decision docker push
-          description: Push decision's docker image on repository
-          owner: fuzzing+taskcluster@mozilla.com
-          source: https://github.com/MozillaSecurity/fuzzing-tc
