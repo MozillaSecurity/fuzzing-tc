@@ -38,6 +38,8 @@ class Workflow(object):
         config = workflow.configure(
             local_path=appconfig.options.get("fuzzing_configuration"),
             secret=appconfig.options.get("fuzzing_taskcluster_secret"),
+            fuzzing_git_repository=appconfig.options.get("fuzzing_git_repository"),
+            fuzzing_git_revision=appconfig.options.get("fuzzing_git_revision"),
         )
 
         # Retrieve remote repositories
@@ -46,7 +48,13 @@ class Workflow(object):
         # Then generate all our Taskcluster resources
         workflow.generate(resources)
 
-    def configure(self, local_path=None, secret=None):
+    def configure(
+        self,
+        local_path=None,
+        secret=None,
+        fuzzing_git_repository=None,
+        fuzzing_git_revision=None,
+    ):
         """Load configuration either from local file or Taskcluster secret"""
 
         if local_path is not None:
@@ -66,13 +74,22 @@ class Workflow(object):
             raise Exception("Specify local_path XOR secret")
 
         assert isinstance(config, dict)
-        assert "fuzzing_config" in config, "Missing fuzzing_config"
         if "community_config" not in config:
             config["community_config"] = {
                 "url": "git@github.com:mozilla/community-tc-config.git"
             }
 
-        # TODO: detect Github repos + revisions
+        # Use Github repo & revision from environment when specified
+        if fuzzing_git_repository and fuzzing_git_revision:
+            logger.info(
+                f"Use Fuzzing git repository from options: {fuzzing_git_repository} @ {fuzzing_git_revision}"
+            )
+            config["fuzzing_config"] = {
+                "url": fuzzing_git_repository,
+                "revision": fuzzing_git_revision,
+            }
+
+        assert "fuzzing_config" in config, "Missing fuzzing_config"
 
         return config
 
@@ -149,27 +166,39 @@ class Workflow(object):
             rf"WorkerPool={WORKER_POOL_PREFIX}/{pool_suffix}",
         ]
 
-    def git_clone(self, url=None, path=None, **kwargs):
+    def git_clone(self, url=None, path=None, revision=None, **kwargs):
         """Clone a configuration repository"""
         if path is not None:
             # Use local path when available
             assert os.path.isdir(path), "Invalid repo dir {path}"
             logger.info(f"Using local configuration in {path}")
-            return path
 
         elif url is not None:
             # Clone from remote repository
-            clone_dir = tempfile.mkdtemp(suffix=url[url.rindex("/") + 1 :])
+            path = tempfile.mkdtemp(suffix=url[url.rindex("/") + 1 :])
 
             # Clone the configuration repository
             logger.info(f"Cloning {url}")
-            cmd = ["git", "clone", "--quiet", url, clone_dir]
+            cmd = ["git", "clone", "--quiet", url, path]
             subprocess.check_output(cmd)
-            logger.info(f"Using cloned config files in {clone_dir}")
-
-            return clone_dir
+            logger.info(f"Using cloned config files in {path}")
         else:
             raise Exception("You need to specify a repo url or local path")
+
+        # Update to specified revision
+        # Fallback to pulling remote references
+        if revision is not None:
+            logger.info(f"Updating repo to {revision}")
+            try:
+                cmd = ["git", "checkout", revision, "-q"]
+                subprocess.check_output(cmd, cwd=path)
+
+            except subprocess.CalledProcessError:
+                logger.info("Updating failed, trying to pull")
+                cmd = ["git", "pull", "origin", revision, "-q"]
+                subprocess.check_output(cmd, cwd=path)
+
+        return path
 
     def cleanup(self):
         """Cleanup temporary folders at end of execution"""

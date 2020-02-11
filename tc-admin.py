@@ -22,6 +22,16 @@ appconfig.options.add(
     help="Taskcluster Secret path for fuzzing",
     default=os.environ.get("TASKCLUSTER_SECRET"),
 )
+appconfig.options.add(
+    "--fuzzing-git-repository",
+    help="A git repository containing the Fuzzing configuration",
+    default=os.environ.get("FUZZING_GIT_REPOSITORY"),
+)
+appconfig.options.add(
+    "--fuzzing-git-revision",
+    help="A git revision for the fuzzing git repository",
+    default=os.environ.get("FUZZING_GIT_REVISION"),
+)
 
 # We always want to run against community Taskcluster instance
 os.environ["TASKCLUSTER_ROOT_URL"] = "https://community-tc.services.mozilla.com"
