@@ -97,8 +97,7 @@ class Workflow(object):
     def generate(self, resources):
 
         # Setup resources manager to track only fuzzing instances
-        patterns = [rf"WorkerPool={WORKER_POOL_PREFIX}/.*", rf"Hook={HOOK_PREFIX}/.*"]
-        for pattern in patterns:
+        for pattern in self.build_resources_patterns():
             resources.manage(pattern)
 
         # Load the AWS configuration from community config
@@ -118,6 +117,37 @@ class Workflow(object):
             pool = pool_config.build_resource(aws, machines)
 
             resources.add(pool)
+
+    def build_resources_patterns(self):
+        """Build regex patterns to manage our resources"""
+
+        # Load existing workerpools from community config
+        path = os.path.join(self.community_config_dir, "config/projects/fuzzing.yml")
+        assert os.path.exists(path), f"Missing fuzzing community config in {path}"
+        community = yaml.load(open(path))
+        assert "fuzzing" in community, "Missing fuzzing main key in community config"
+
+        def _suffix(data, key):
+            existing = data.get(key, {}).keys()
+            if not existing:
+                # Manage every resource possible
+                return ".*"
+
+            # Exclude existing resources from managed resources
+            logger.info(
+                "Found existing {} in community config: {}".format(
+                    key, ", ".join(existing)
+                )
+            )
+            return "(?!({})$)".format("|".join(existing))
+
+        hook_suffix = _suffix(community["fuzzing"], "hooks")
+        pool_suffix = _suffix(community["fuzzing"], "workerPools")
+
+        return [
+            rf"Hook={HOOK_PREFIX}/{hook_suffix}",
+            rf"WorkerPool={WORKER_POOL_PREFIX}/{pool_suffix}",
+        ]
 
     def git_clone(self, url=None, path=None, **kwargs):
         """Clone a configuration repository"""
