@@ -8,11 +8,14 @@ import subprocess
 import tempfile
 
 import yaml
-from taskcluster import Secrets, optionsFromEnvironment
+from taskcluster import Secrets
+from taskcluster import optionsFromEnvironment
 from tcadmin.appconfig import AppConfig
 
-from decision import HOOK_PREFIX, WORKER_POOL_PREFIX
-from decision.pool import MachineTypes, PoolConfiguration
+from decision import HOOK_PREFIX
+from decision import WORKER_POOL_PREFIX
+from decision.pool import MachineTypes
+from decision.pool import PoolConfiguration
 from decision.providers import AWS
 
 logger = logging.getLogger()
@@ -131,9 +134,7 @@ class Workflow(object):
 
             pool_config = PoolConfiguration.from_file(config_file)
 
-            pool = pool_config.build_resource(aws, machines)
-
-            resources.add(pool)
+            resources.update(pool_config.build_resources(aws, machines))
 
     def build_resources_patterns(self):
         """Build regex patterns to manage our resources"""
@@ -164,6 +165,8 @@ class Workflow(object):
         return [
             rf"Hook={HOOK_PREFIX}/{hook_suffix}",
             rf"WorkerPool={WORKER_POOL_PREFIX}/{pool_suffix}",
+            # We only manage all the hooks roles
+            rf"Role=hook-id:{HOOK_PREFIX}/.*",
         ]
 
     def git_clone(self, url=None, path=None, revision=None, **kwargs):

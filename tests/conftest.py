@@ -5,6 +5,11 @@ import os
 import pytest
 import responses
 
+from decision.pool import MachineTypes
+from decision.providers import AWS
+
+FIXTURES_DIR = os.path.join(os.path.dirname(__file__), "fixtures")
+
 
 @pytest.fixture
 def mock_taskcluster():
@@ -25,3 +30,17 @@ def mock_taskcluster():
         body=json.dumps({"secret": secret}),
         content_type="application/json",
     )
+
+
+@pytest.fixture
+def mock_aws():
+    """Mock Amazon Cloud provider setup"""
+    return AWS(os.path.join(FIXTURES_DIR, "community"))
+
+
+@pytest.fixture
+def mock_machines():
+    """Mock a static list of machines"""
+    path = os.path.join(FIXTURES_DIR, "machines.yml")
+    assert os.path.exists(path)
+    return MachineTypes.from_file(path)

@@ -3,9 +3,15 @@ import os
 import re
 
 import yaml
+from tcadmin.resources import Hook
+from tcadmin.resources import Role
 from tcadmin.resources import WorkerPool
 
-from decision import OWNER_EMAIL, WORKER_POOL_PREFIX
+from decision import HOOK_PREFIX
+from decision import OWNER_EMAIL
+from decision import PROVISIONER_ID
+from decision import SCHEDULER_ID
+from decision import WORKER_POOL_PREFIX
 
 DESCRIPTION = """*DO NOT EDIT* - This resource is configured automatically.
 
@@ -171,7 +177,7 @@ class PoolConfiguration:
         self._flatten(_flattened)
 
         # Build pool id
-        self.id = f"{WORKER_POOL_PREFIX}/{self.platform}-{filename}"
+        self.id = f"{self.platform}-{self.filename}"
 
     def is_complete(self):
         for field in FIELDS:
@@ -240,8 +246,8 @@ class PoolConfiguration:
             cpus = machine_types.cpus(self.cloud, self.cpu, machine)
             yield (machine, cpus // self.cores_per_task)
 
-    def build_resource(self, provider, machine_types):
-        """Build the full tc-admin resource to compare and build the pool"""
+    def build_resources(self, provider, machine_types):
+        """Build the full tc-admin resources to compare and build the pool"""
 
         # Load the AWS infos for that imageset
         amis = provider.get_amis(self.imageset)
@@ -276,14 +282,70 @@ class PoolConfiguration:
             ],
         }
 
-        return WorkerPool(
-            workerPoolId=self.id,
+        task = {
+            "created": {"$fromNow": "0 seconds"},
+            "deadline": {"$fromNow": f"{self.cycle_time} seconds"},
+            "expires": {"$fromNow": "1 month"},
+            "extra": {},
+            "metadata": {
+                "description": DESCRIPTION,
+                "name": f"Fuzzing task {self.id}",
+                "owner": OWNER_EMAIL,
+                "source": "https://github.com/MozillaSecurity/fuzzing-tc",
+            },
+            "payload": {
+                "artifacts": {},
+                "cache": {},
+                "capabilities": {},
+                "env": {},
+                "features": {"taskclusterProxy": True},
+                "image": self.container,
+                "maxRunTime": self.cycle_time,
+            },
+            "priority": "high",
+            "provisionerId": PROVISIONER_ID,
+            "workerType": self.id,
+            "retries": 1,
+            "routes": [],
+            "schedulerId": SCHEDULER_ID,
+            "scopes": self.scopes,
+            "tags": {},
+        }
+
+        pool = WorkerPool(
+            workerPoolId=f"{WORKER_POOL_PREFIX}/{self.id}",
             providerId=f"community-tc-workers-{self.cloud}",
             description=DESCRIPTION,
             owner=OWNER_EMAIL,
             emailOnError=True,
             config=config,
         )
+
+        hook = Hook(
+            hookGroupId=HOOK_PREFIX,
+            hookId=self.id,
+            name=self.name,
+            description="Generated Fuzzing hook",
+            owner=OWNER_EMAIL,
+            emailOnError=True,
+            schedule=(),  # TODO
+            task=task,
+            bindings=(),
+            triggerSchema={},
+        )
+
+        role = Role(
+            roleId=f"hook-id:{HOOK_PREFIX}/{self.id}",
+            description=DESCRIPTION,
+            scopes=tuple(self.scopes)
+            + (
+                # Mandatory scopes to execute the hook
+                f"queue:scheduler-id:{SCHEDULER_ID}",
+                f"queue:create-task:highest:{PROVISIONER_ID}/{self.id}",
+            ),
+        )
+
+        return [pool, hook, role]
 
     @classmethod
     def from_file(cls, pool_yml, _flattened=None):

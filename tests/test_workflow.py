@@ -26,6 +26,7 @@ def test_patterns(tmpdir):
     assert patterns == [
         "Hook=project-fuzzing/.*",
         "WorkerPool=proj-fuzzing/(?!(ci|pool-A)$)",
+        "Role=hook-id:project-fuzzing/.*",
     ]
 
     def _match(test):

@@ -37,11 +37,11 @@ class AWS(object):
         }
 
     def get_amis(self, worker):
-        assert worker in self.imagesets, "Missing worker {worker}"
+        assert worker in self.imagesets, f"Missing worker {worker}"
         return self.imagesets[worker]["aws"]["amis"]
 
     def get_worker_config(self, worker):
-        assert worker in self.imagesets, "Missing worker {worker}"
+        assert worker in self.imagesets, f"Missing worker {worker}"
         out = self.imagesets[worker]["workerConfig"]
 
         # Fixed config for websocket tunnel
