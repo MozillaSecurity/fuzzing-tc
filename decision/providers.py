@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+import hashlib
+import json
 import logging
 import os
 
@@ -43,11 +45,17 @@ class AWS(object):
         out = self.imagesets[worker]["workerConfig"]
 
         # Fixed config for websocket tunnel
-        out.update(
+        out["genericWorker"]["config"].update(
             {
                 "wstAudience": "communitytc",
                 "wstServerURL": "https://community-websocktunnel.services.mozilla.com",
             }
         )
+
+        # Add a deploymentId by hashing the config
+        payload = json.dumps(out, sort_keys=True).encode("utf-8")
+        out["genericWorker"]["config"]["deploymentId"] = hashlib.sha256(
+            payload
+        ).hexdigest()[:16]
 
         return out

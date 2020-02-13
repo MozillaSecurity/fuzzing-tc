@@ -258,7 +258,7 @@ class PoolConfiguration:
                     "launchConfig": {
                         "ImageId": amis[region_name],
                         "Placement": {"AvailabilityZone": az},
-                        "SubnetId": az,
+                        "SubnetId": subnet,
                         "SecurityGroupIds": [
                             # Always use the no-inbound sec group
                             region["security_groups"]["no-inbound"]
