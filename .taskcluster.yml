@@ -37,7 +37,7 @@ tasks:
       workerType: ci
       payload:
         maxRunTime: 1200
-        image: python:3.7-slim
+        image: python:3.7
         command:
           - /bin/bash
           - -cxe
