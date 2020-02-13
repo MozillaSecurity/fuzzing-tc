@@ -8,6 +8,7 @@ import responses
 
 from decision.pool import MachineTypes
 from decision.providers import AWS
+from decision.providers import GCP
 from decision.workflow import Workflow
 
 FIXTURES_DIR = os.path.join(os.path.dirname(__file__), "fixtures")
@@ -35,9 +36,10 @@ def mock_taskcluster():
 
 
 @pytest.fixture
-def mock_aws():
-    """Mock Amazon Cloud provider setup"""
-    return AWS(os.path.join(FIXTURES_DIR, "community"))
+def mock_clouds():
+    """Mock Cloud providers setup"""
+    community = os.path.join(FIXTURES_DIR, "community")
+    return {"aws": AWS(community), "gcp": GCP(community)}
 
 
 @pytest.fixture

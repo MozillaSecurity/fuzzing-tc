@@ -17,6 +17,7 @@ from decision import WORKER_POOL_PREFIX
 from decision.pool import MachineTypes
 from decision.pool import PoolConfiguration
 from decision.providers import AWS
+from decision.providers import GCP
 
 logger = logging.getLogger()
 
@@ -120,8 +121,11 @@ class Workflow(object):
         for pattern in self.build_resources_patterns():
             resources.manage(pattern)
 
-        # Load the AWS configuration from community config
-        aws = AWS(self.community_config_dir)
+        # Load the cloud configuration from community config
+        clouds = {
+            "aws": AWS(self.community_config_dir),
+            "gcp": GCP(self.community_config_dir),
+        }
 
         # Load the machine types
         machines = MachineTypes.from_file(
@@ -134,7 +138,7 @@ class Workflow(object):
 
             pool_config = PoolConfiguration.from_file(config_file)
 
-            resources.update(pool_config.build_resources(aws, machines))
+            resources.update(pool_config.build_resources(clouds, machines))
 
     def build_resources_patterns(self):
         """Build regex patterns to manage our resources"""
@@ -206,6 +210,8 @@ class Workflow(object):
     def cleanup(self):
         """Cleanup temporary folders at end of execution"""
         for folder in (self.community_config_dir, self.fuzzing_config_dir):
-            if folder and folder.startswith(tempfile.gettempdir()):
+            if not os.path.exists(folder):
+                continue
+            if folder is not None and folder.startswith(tempfile.gettempdir()):
                 logger.info(f"Removing tempdir clone {folder}")
                 shutil.rmtree(folder)
