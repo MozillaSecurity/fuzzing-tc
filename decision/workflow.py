@@ -142,7 +142,7 @@ class Workflow(object):
         # Load existing workerpools from community config
         path = os.path.join(self.community_config_dir, "config/projects/fuzzing.yml")
         assert os.path.exists(path), f"Missing fuzzing community config in {path}"
-        community = yaml.load(open(path))
+        community = yaml.safe_load(open(path))
         assert "fuzzing" in community, "Missing fuzzing main key in community config"
 
         def _suffix(data, key):

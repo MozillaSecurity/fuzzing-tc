@@ -1,12 +1,14 @@
 # -*- coding: utf-8 -*-
 import json
 import os
+from unittest.mock import Mock
 
 import pytest
 import responses
 
 from decision.pool import MachineTypes
 from decision.providers import AWS
+from decision.workflow import Workflow
 
 FIXTURES_DIR = os.path.join(os.path.dirname(__file__), "fixtures")
 
@@ -44,3 +46,9 @@ def mock_machines():
     path = os.path.join(FIXTURES_DIR, "machines.yml")
     assert os.path.exists(path)
     return MachineTypes.from_file(path)
+
+
+@pytest.fixture(autouse=True)
+def disable_cleanup():
+    """Disable workflow cleanup in unit tests as tmpdir is automatically removed"""
+    Workflow.cleanup = Mock()
