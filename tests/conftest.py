@@ -6,6 +6,7 @@ from unittest.mock import Mock
 import pytest
 import responses
 
+from decision import taskcluster
 from decision.pool import MachineTypes
 from decision.providers import AWS
 from decision.providers import GCP
@@ -19,7 +20,7 @@ def mock_taskcluster():
     """Mock Taskcluster HTTP services"""
 
     # Setup mock url for taskcluster services
-    os.environ["TASKCLUSTER_ROOT_URL"] = "http://taskcluster.test"
+    taskcluster.options = {"rootUrl": "http://taskcluster.test"}
 
     # Add a basic configuration for the workflow in a secret
     secret = {

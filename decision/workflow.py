@@ -8,12 +8,11 @@ import subprocess
 import tempfile
 
 import yaml
-from taskcluster import Secrets
-from taskcluster import optionsFromEnvironment
 from tcadmin.appconfig import AppConfig
 
 from decision import HOOK_PREFIX
 from decision import WORKER_POOL_PREFIX
+from decision import taskcluster
 from decision.pool import MachineTypes
 from decision.pool import PoolConfiguration
 from decision.providers import AWS
@@ -66,14 +65,7 @@ class Workflow(object):
             config = yaml.safe_load(open(local_path))
 
         elif secret is not None:
-            # Use Proxy when available
-            tc_options = optionsFromEnvironment()
-            if "TASKCLUSTER_PROXY_URL" in os.environ:
-                tc_options["rootUrl"] = os.environ["TASKCLUSTER_PROXY_URL"]
-            secrets = Secrets(tc_options)
-            response = secrets.get(secret)
-            assert response is not None, "Invalid Taskcluster secret payload"
-            config = response["secret"]
+            config = taskcluster.load_secrets(secret)
         else:
             raise Exception("Specify local_path XOR secret")
 

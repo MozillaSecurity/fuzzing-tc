@@ -1,8 +1,14 @@
 # -*- coding: utf-8 -*-
 import logging
 
+from taskcluster.helper import TaskclusterConfig
+
 # Setup logger
 logging.basicConfig(level=logging.INFO)
+
+# Shared taskcluster configuration
+taskcluster = TaskclusterConfig("https://community-tc.services.mozilla.com")
+taskcluster.auth()
 
 # Constants for our resources
 OWNER_EMAIL = "fuzzing+taskcluster@mozilla.com"

@@ -1,2 +1,1 @@
-pyyaml==5.2
-tc-admin==2.2.0
+tc-admin==2.3.0
