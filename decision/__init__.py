@@ -17,3 +17,4 @@ PROVISIONER_ID = "proj-fuzzing"
 WORKER_POOL_PREFIX = "proj-fuzzing"
 HOOK_PREFIX = "project-fuzzing"
 PROVIDER_IDS = {"aws": "community-tc-workers-aws", "gcp": "community-tc-workers-google"}
+DECISION_TASK_SECRET = "project/fuzzing/decision"

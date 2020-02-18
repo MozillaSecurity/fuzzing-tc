@@ -1,12 +1,18 @@
 # coding: utf-8
 import os
 import re
+from datetime import datetime
+from datetime import timedelta
 
 import yaml
+from taskcluster.utils import fromNow
+from taskcluster.utils import slugId
+from taskcluster.utils import stringDate
 from tcadmin.resources import Hook
 from tcadmin.resources import Role
 from tcadmin.resources import WorkerPool
 
+from decision import DECISION_TASK_SECRET
 from decision import HOOK_PREFIX
 from decision import OWNER_EMAIL
 from decision import PROVIDER_IDS
@@ -267,14 +273,23 @@ class PoolConfiguration:
             ),
         }
 
-        task = {
+        # Mandatory scopes to execute the hook
+        # or create new tasks
+        decision_task_scopes = (
+            f"queue:scheduler-id:{SCHEDULER_ID}",
+            f"queue:create-task:highest:{PROVISIONER_ID}/{self.id}",
+            f"secrets:get:{DECISION_TASK_SECRET}",
+        )
+
+        # Build the decision task payload that will trigger the new fuzzing tasks
+        decision_task = {
             "created": {"$fromNow": "0 seconds"},
-            "deadline": {"$fromNow": f"{self.cycle_time} seconds"},
+            "deadline": {"$fromNow": "1 hour"},
             "expires": {"$fromNow": "1 month"},
             "extra": {},
             "metadata": {
                 "description": DESCRIPTION,
-                "name": f"Fuzzing task {self.id}",
+                "name": f"Fuzzing decision {self.id}",
                 "owner": OWNER_EMAIL,
                 "source": "https://github.com/MozillaSecurity/fuzzing-tc",
             },
@@ -282,10 +297,15 @@ class PoolConfiguration:
                 "artifacts": {},
                 "cache": {},
                 "capabilities": {},
-                "env": {},
+                "env": {"TASKCLUSTER_SECRET": DECISION_TASK_SECRET},
                 "features": {"taskclusterProxy": True},
-                "image": self.container,
-                "maxRunTime": self.cycle_time,
+                "image": {
+                    "type": "indexed-image",
+                    "path": "public/fuzzing-tc-decision.tar",
+                    "namespace": "project.fuzzing.config.master",
+                },
+                "command": ["fuzzing-decision", self.filename],
+                "maxRunTime": 3600,
             },
             "priority": "high",
             "provisionerId": PROVISIONER_ID,
@@ -293,7 +313,7 @@ class PoolConfiguration:
             "retries": 1,
             "routes": [],
             "schedulerId": SCHEDULER_ID,
-            "scopes": self.scopes,
+            "scopes": decision_task_scopes,
             "tags": {},
         }
 
@@ -314,7 +334,7 @@ class PoolConfiguration:
             owner=OWNER_EMAIL,
             emailOnError=True,
             schedule=(),  # TODO
-            task=task,
+            task=decision_task,
             bindings=(),
             triggerSchema={},
         )
@@ -322,15 +342,49 @@ class PoolConfiguration:
         role = Role(
             roleId=f"hook-id:{HOOK_PREFIX}/{self.id}",
             description=DESCRIPTION,
-            scopes=tuple(self.scopes)
-            + (
-                # Mandatory scopes to execute the hook
-                f"queue:scheduler-id:{SCHEDULER_ID}",
-                f"queue:create-task:highest:{PROVISIONER_ID}/{self.id}",
-            ),
+            scopes=tuple(self.scopes) + decision_task_scopes,
         )
 
         return [pool, hook, role]
+
+    def build_tasks(self, parent_task_id):
+        """Create fuzzing tasks and attach them to a decision task"""
+        now = datetime.utcnow()
+        for i in range(1, self.tasks + 1):
+            task_id = slugId()
+            task = {
+                "taskGroupId": parent_task_id,
+                "dependencies": [parent_task_id],
+                "created": stringDate(now),
+                "deadline": stringDate(now + timedelta(seconds=self.cycle_time)),
+                "expires": stringDate(fromNow("1 month", now)),
+                "extra": {},
+                "metadata": {
+                    "description": DESCRIPTION,
+                    "name": f"Fuzzing task {self.id} - {i}/{self.tasks}",
+                    "owner": OWNER_EMAIL,
+                    "source": "https://github.com/MozillaSecurity/fuzzing-tc",
+                },
+                "payload": {
+                    "artifacts": {},
+                    "cache": {},
+                    "capabilities": {},
+                    "env": {},
+                    "features": {"taskclusterProxy": True},
+                    "image": self.container,
+                    "maxRunTime": self.cycle_time,
+                },
+                "priority": "high",
+                "provisionerId": PROVISIONER_ID,
+                "workerType": self.id,
+                "retries": 1,
+                "routes": [],
+                "schedulerId": SCHEDULER_ID,
+                "scopes": self.scopes,
+                "tags": {},
+            }
+
+            yield task_id, task
 
     @classmethod
     def from_file(cls, pool_yml, _flattened=None):

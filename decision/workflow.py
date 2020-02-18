@@ -165,6 +165,20 @@ class Workflow(object):
             rf"Role=hook-id:{HOOK_PREFIX}/.*",
         ]
 
+    def build_tasks(self, pool_name, task_id):
+        path = os.path.join(self.fuzzing_config_dir, f"{pool_name}.yml")
+        assert os.path.exists(path), f"Missing pool {pool_name}"
+
+        # Build tasks needed for a specific pool
+        pool_config = PoolConfiguration.from_file(path)
+        tasks = pool_config.build_tasks(task_id)
+
+        # Create all the tasks on taskcluster
+        queue = taskcluster.get_service("queue")
+        for task_id, task in tasks:
+            logger.info(f"Creating task {task['metadata']['name']} as {task_id}")
+            queue.createTask(task_id, task)
+
     def git_clone(self, url=None, path=None, revision=None, **kwargs):
         """Clone a configuration repository"""
         if path is not None:
@@ -202,8 +216,8 @@ class Workflow(object):
     def cleanup(self):
         """Cleanup temporary folders at end of execution"""
         for folder in (self.community_config_dir, self.fuzzing_config_dir):
-            if not os.path.exists(folder):
+            if folder is None or not os.path.exists(folder):
                 continue
-            if folder is not None and folder.startswith(tempfile.gettempdir()):
+            if folder.startswith(tempfile.gettempdir()):
                 logger.info(f"Removing tempdir clone {folder}")
                 shutil.rmtree(folder)

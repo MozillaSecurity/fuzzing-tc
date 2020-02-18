@@ -26,6 +26,7 @@ setuptools.setup(
     author_email="fuzzing+taskcluster@mozilla.com",
     url="https://github.com/mozillasecurity/fuzzing-tc",
     install_requires=read_requirements("requirements.txt"),
+    entry_points={"console_scripts": ["fuzzing-decision=decision.cli:main"]},
     packages=setuptools.find_packages(),
     include_package_data=True,
     zip_safe=False,
