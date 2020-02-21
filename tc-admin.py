@@ -8,7 +8,7 @@ import os
 
 from tcadmin.appconfig import AppConfig
 
-from decision.workflow import Workflow
+from fuzzing_tc.decision.workflow import Workflow
 
 appconfig = AppConfig()
 

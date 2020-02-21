@@ -5,9 +5,10 @@
 # obtain one at http://mozilla.org/MPL/2.0/.
 
 import argparse
+import logging
 import os
 
-from decision.workflow import Workflow
+from .workflow import Workflow
 
 
 def main():
@@ -37,6 +38,9 @@ def main():
     # We need both task & task group information
     if not args.task_id:
         raise Exception("Missing decision task id")
+
+    # Setup logger
+    logging.basicConfig(level=logging.INFO)
 
     # Configure workflow using the secret or local configuration
     workflow = Workflow()

@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
+
 from datetime import datetime
 
 import pytest
 import slugid
 
-from decision.pool import PoolConfiguration
+from fuzzing_tc.decision.pool import PoolConfiguration
 
 
 @pytest.mark.parametrize(
@@ -56,7 +57,7 @@ VALID_HOOK = {
     "emailOnError": True,
     "hookGroupId": "project-fuzzing",
     "hookId": "linux-test",
-    "name": "Amazing fuzzing pool",
+    "name": "linux-test",
     "owner": "fuzzing+taskcluster@mozilla.com",
     "schedule": [],
     "task": {
@@ -350,7 +351,7 @@ def test_tasks():
                 "artifacts": {},
                 "cache": {},
                 "capabilities": {},
-                "env": {},
+                "env": {"TASKCLUSTER_FUZZING_POOL": "test"},
                 "features": {"taskclusterProxy": True},
                 "image": "MozillaSecurity/fuzzer:latest",
                 "maxRunTime": 3600,
