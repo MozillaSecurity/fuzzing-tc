@@ -43,12 +43,12 @@ tasks:
           - -cxe
           - |
             apt-get update -qq
-            apt-get install -qq git > /dev/null
+            apt-get install --no-install-recommends -qq git > /dev/null
             git clone --quiet ${repository} /src
             cd /src
             git -c advice.detachedHead=false checkout ${head_rev}
-            pip install --disable-pip-version-check --no-cache-dir --quiet -r /src/tests-requirements.txt
-            pre-commit run -a
+            pip install --disable-pip-version-check --no-cache-dir --quiet tox
+            tox -e lint
       metadata:
         name: Fuzzing Taskcluster decision lint
         description: Check that the source code from Decision task source code is nice & clean
@@ -68,12 +68,12 @@ tasks:
           - -cxe
           - |
             apt-get update -qq
-            apt-get install -qq git > /dev/null
+            apt-get install --no-install-recommends -qq git > /dev/null
             git clone --quiet ${repository} /src
             cd /src
             git -c advice.detachedHead=false checkout ${head_rev}
-            pip install --disable-pip-version-check --no-cache-dir --quiet -r /src/tests-requirements.txt /src
-            pytest -v
+            pip install --disable-pip-version-check --no-cache-dir --quiet tox
+            TOX_SKIP_ENV=lint tox
       metadata:
         name: Fuzzing Taskcluster decision unit tests
         description: Check that the unit tests from Decision tasks are valid

@@ -88,14 +88,13 @@ tc-admin diff --fuzzing-configuration=path/to/config.yml
 To run unit tests:
 
 ```bash
-pip install -r tests-requirements.txt
-pytest
+pip install tox
+tox
 ```
 
 To run linting:
 
 ```bash
-pip install -r tests-requirements.txt
 pre-commit install
 
 # will run on new commits now
