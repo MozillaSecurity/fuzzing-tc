@@ -1,7 +1,10 @@
-FROM python:3.7
+FROM python:3.7-slim
+
+ENV DEBIAN_FRONTEND=noninteractive
 
 # Setup git for ssh clones
-RUN apt-get update -qq && apt-get install --no-install-recommends -qq git openssh-client && rm -rf /var/lib/apt/lists/*
+# Setup gcc to build patiencediff
+RUN apt-get update -qq && apt-get install --no-install-recommends -qq gcc libc6-dev git openssh-client && rm -rf /var/lib/apt/lists/*
 RUN mkdir ~/.ssh && chmod 0600 ~/.ssh && ssh-keyscan github.com > ~/.ssh/known_hosts
 
 COPY . /src
