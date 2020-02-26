@@ -50,7 +50,7 @@ class PoolConfiguration(CommonPoolConfiguration):
         tasks (int): number of tasks to run (each with `cores_per_task`)
     """
 
-    def build_resources(self, providers, machine_types):
+    def build_resources(self, providers, machine_types, env=None):
         """Build the full tc-admin resources to compare and build the pool"""
 
         # Select a cloud provider according to configuration
@@ -110,6 +110,11 @@ class PoolConfiguration(CommonPoolConfiguration):
             "scopes": decision_task_scopes,
             "tags": {},
         }
+        if env is not None:
+            assert set(decision_task["payload"]["env"].keys()).isdisjoint(
+                set(env.keys())
+            )
+            decision_task["payload"]["env"].update(env)
 
         pool = WorkerPool(
             workerPoolId=f"{WORKER_POOL_PREFIX}/{self.id}",
@@ -141,7 +146,7 @@ class PoolConfiguration(CommonPoolConfiguration):
 
         return [pool, hook, role]
 
-    def build_tasks(self, parent_task_id):
+    def build_tasks(self, parent_task_id, env=None):
         """Create fuzzing tasks and attach them to a decision task"""
         now = datetime.utcnow()
         for i in range(1, self.tasks + 1):
@@ -177,5 +182,8 @@ class PoolConfiguration(CommonPoolConfiguration):
                 "scopes": self.scopes,
                 "tags": {},
             }
+            if env is not None:
+                assert set(task["payload"]["env"]).isdisjoint(set(env))
+                task["payload"]["env"].update(env)
 
             yield task_id, task

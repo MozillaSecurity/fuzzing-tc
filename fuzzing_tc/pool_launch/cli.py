@@ -7,29 +7,19 @@
 import argparse
 import logging
 import os
-import pathlib
+
+from fuzzing_tc.common.cli import build_cli_parser
 
 from .launcher import PoolLauncher
 
 
 def main(args=None):
-    parser = argparse.ArgumentParser(prog="fuzzing-pool-launch")
+    parser = build_cli_parser(prog="fuzzing-pool-launch")
     parser.add_argument(
         "--pool-name",
         type=str,
         help="The target fuzzing pool to create tasks for",
         default=os.environ.get("FUZZING_POOL"),
-    )
-    parser.add_argument(
-        "--taskcluster-secret",
-        type=str,
-        help="Taskcluster Secret path for configuration",
-        default=os.environ.get("TASKCLUSTER_SECRET"),
-    )
-    parser.add_argument(
-        "--configuration",
-        type=pathlib.Path,
-        help="Local configuration file replacing Taskcluster secrets for fuzzing",
     )
     parser.add_argument("command", help="docker command-line", nargs=argparse.REMAINDER)
     args = parser.parse_args(args=args)
@@ -40,7 +30,10 @@ def main(args=None):
     # Configure workflow using the secret or local configuration
     launcher = PoolLauncher(args.command, args.pool_name)
     config = launcher.configure(
-        local_path=args.configuration, secret=args.taskcluster_secret
+        local_path=args.configuration,
+        secret=args.taskcluster_secret,
+        fuzzing_git_repository=args.git_repository,
+        fuzzing_git_revision=args.git_revision,
     )
 
     if config is not None:

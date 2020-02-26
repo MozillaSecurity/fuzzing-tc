@@ -42,8 +42,8 @@ class Workflow(CommonWorkflow):
             raise Exception("Specify local_path XOR secret")
         return config
 
-    @staticmethod
-    async def tc_admin_boot(resources):
+    @classmethod
+    async def tc_admin_boot(cls, resources):
         """Setup the workflow to be usable by tc-admin"""
         appconfig = AppConfig.current()
 
@@ -52,7 +52,7 @@ class Workflow(CommonWorkflow):
             local_path = pathlib.Path(local_path)
 
         # Configure workflow using tc-admin options
-        workflow = Workflow()
+        workflow = cls()
         config = workflow.configure(
             local_path=local_path,
             secret=appconfig.options.get("fuzzing_taskcluster_secret"),
@@ -64,7 +64,7 @@ class Workflow(CommonWorkflow):
         workflow.clone(config)
 
         # Then generate all our Taskcluster resources
-        workflow.generate(resources)
+        workflow.generate(resources, config)
 
     def clone(self, config):
         """Clone remote repositories according to current setup"""
@@ -74,7 +74,7 @@ class Workflow(CommonWorkflow):
         self.fuzzing_config_dir = self.git_clone(**config["fuzzing_config"])
         self.community_config_dir = self.git_clone(**config["community_config"])
 
-    def generate(self, resources):
+    def generate(self, resources, config):
 
         # Setup resources manager to track only fuzzing instances
         for pattern in self.build_resources_patterns():
@@ -89,12 +89,18 @@ class Workflow(CommonWorkflow):
         # Load the machine types
         machines = MachineTypes.from_file(self.fuzzing_config_dir / "machines.yml")
 
+        # Pass fuzzing-tc-config repository through to decision tasks, if specified
+        env = {}
+        if set(config["fuzzing_config"]) >= {"url", "revision"}:
+            env["FUZZING_GIT_REPOSITORY"] = config["fuzzing_config"]["url"]
+            env["FUZZING_GIT_REVISION"] = config["fuzzing_config"]["revision"]
+
         # Browse the files in the repo
         for config_file in self.fuzzing_config_dir.glob("pool*.yml"):
 
             pool_config = PoolConfiguration.from_file(config_file)
 
-            resources.update(pool_config.build_resources(clouds, machines))
+            resources.update(pool_config.build_resources(clouds, machines, env))
 
     def build_resources_patterns(self):
         """Build regex patterns to manage our resources"""
@@ -129,13 +135,19 @@ class Workflow(CommonWorkflow):
             rf"Role=hook-id:{HOOK_PREFIX}/.*",
         ]
 
-    def build_tasks(self, pool_name, task_id):
+    def build_tasks(self, pool_name, task_id, config):
         path = self.fuzzing_config_dir / f"{pool_name}.yml"
         assert path.exists(), f"Missing pool {pool_name}"
 
+        # Pass fuzzing-tc-config repository through to tasks, if specified
+        env = {}
+        if set(config["fuzzing_config"]) >= {"url", "revision"}:
+            env["FUZZING_GIT_REPOSITORY"] = config["fuzzing_config"]["url"]
+            env["FUZZING_GIT_REVISION"] = config["fuzzing_config"]["revision"]
+
         # Build tasks needed for a specific pool
         pool_config = PoolConfiguration.from_file(path)
-        tasks = pool_config.build_tasks(task_id)
+        tasks = pool_config.build_tasks(task_id, env)
 
         # Create all the tasks on taskcluster
         queue = self.taskcluster.get_service("queue")
