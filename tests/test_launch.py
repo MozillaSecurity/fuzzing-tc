@@ -88,3 +88,29 @@ def test_load_params(tmp_path):
 
     with pytest.raises(AssertionError):
         launcher.load_params()
+
+
+def test_launch_exec(tmp_path, monkeypatch):
+    # Start with taskcluster detection disabled, even on CI
+    monkeypatch.delenv("TASK_ID", raising=False)
+    monkeypatch.delenv("TASKCLUSTER_ROOT_URL", raising=False)
+    with patch("os.execvpe"), patch("os.dup2"):
+        log_dir = tmp_path / "logs"
+        pool = PoolLauncher(["cmd"], "testpool")
+        assert pool.in_taskcluster is False
+        pool.log_dir = str(log_dir)
+        pool.exec()
+        os.dup2.assert_not_called()
+        os.execvpe.assert_called_once_with("cmd", ["cmd"], pool.environment)
+        assert not log_dir.is_dir()
+
+        # Then enable taskcluster detection
+        monkeypatch.setenv("TASK_ID", "someTask")
+        monkeypatch.setenv("TASKCLUSTER_ROOT_URL", "http://fakeTaskcluster")
+        assert pool.in_taskcluster is True
+
+        os.execvpe.reset_mock()
+        pool.exec()
+        assert os.dup2.call_count == 2
+        os.execvpe.assert_called_once_with("cmd", ["cmd"], pool.environment)
+        assert log_dir.is_dir()

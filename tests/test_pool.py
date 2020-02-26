@@ -334,12 +334,17 @@ def test_tasks(env):
     # Check we have 2 valid task definitions
     assert len(tasks) == 2
 
-    def _check_date(task, key):
+    def _check_date(task, *keys):
         # Dates can not be checked directly as they are generated
-        value = task[key]
+        assert keys, "must specify at least one key"
+        value = task
+        for key in keys:
+            obj = value
+            assert isinstance(obj, dict)
+            value = obj[key]
         assert isinstance(value, str)
         date = datetime.strptime(value, "%Y-%m-%dT%H:%M:%S.%fZ")
-        del task[key]
+        del obj[key]
         return date
 
     for i, task in enumerate(tasks):
@@ -350,6 +355,11 @@ def test_tasks(env):
         expected_env = {"TASKCLUSTER_FUZZING_POOL": "test"}
         if env is not None:
             expected_env.update(env)
+
+        log_expires = _check_date(
+            task, "payload", "artifacts", "project/fuzzing/private/logs", "expires"
+        )
+        assert log_expires == expires
         assert task == {
             "dependencies": ["someTaskId"],
             "extra": {},
@@ -363,7 +373,12 @@ def test_tasks(env):
                 "source": "https://github.com/MozillaSecurity/fuzzing-tc",
             },
             "payload": {
-                "artifacts": {},
+                "artifacts": {
+                    "project/fuzzing/private/logs": {
+                        "path": "/logs/",
+                        "type": "directory",
+                    }
+                },
                 "cache": {},
                 "capabilities": {},
                 "env": expected_env,

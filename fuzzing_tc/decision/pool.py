@@ -165,7 +165,13 @@ class PoolConfiguration(CommonPoolConfiguration):
                     "source": "https://github.com/MozillaSecurity/fuzzing-tc",
                 },
                 "payload": {
-                    "artifacts": {},
+                    "artifacts": {
+                        "project/fuzzing/private/logs": {
+                            "expires": stringDate(fromNow("1 month", now)),
+                            "path": "/logs/",
+                            "type": "directory",
+                        }
+                    },
                     "cache": {},
                     "capabilities": {},
                     "env": {"TASKCLUSTER_FUZZING_POOL": self.filename},

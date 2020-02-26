@@ -5,6 +5,7 @@
 # obtain one at http://mozilla.org/MPL/2.0/.
 
 import logging
+import os
 import pathlib
 import subprocess
 import tempfile
@@ -22,6 +23,10 @@ class Workflow:
             "https://community-tc.services.mozilla.com"
         )
         self.taskcluster.auth()
+
+    @property
+    def in_taskcluster(self):
+        return "TASK_ID" in os.environ and "TASKCLUSTER_ROOT_URL" in os.environ
 
     def configure(
         self,
