@@ -7,6 +7,7 @@
 import argparse
 import logging
 import os
+import pathlib
 
 from .workflow import Workflow
 
@@ -24,7 +25,7 @@ def main():
     )
     parser.add_argument(
         "--configuration",
-        type=str,
+        type=pathlib.Path,
         help="Local configuration file replacing Taskcluster secrets for fuzzing",
     )
     parser.add_argument(

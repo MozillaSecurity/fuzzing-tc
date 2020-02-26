@@ -33,8 +33,8 @@ class PoolLauncher(Workflow):
         self.fuzzing_config_dir = self.git_clone(**config["fuzzing_config"])
 
     def load_params(self):
-        path = os.path.join(self.fuzzing_config_dir, f"{self.pool_name}.yml")
-        assert os.path.exists(path), f"Missing pool {self.pool_name}"
+        path = self.fuzzing_config_dir / f"{self.pool_name}.yml"
+        assert path.exists(), f"Missing pool {self.pool_name}"
 
         # Build tasks needed for a specific pool
         pool_config = PoolConfiguration.from_file(path)

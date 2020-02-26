@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
+
 import hashlib
 import json
 import logging
-import os
 
 import yaml
 
@@ -14,15 +14,15 @@ class AWS(object):
 
     def __init__(self, base_dir):
         # Load configuration from cloned community config
-        self.regions = self.load_regions(os.path.join(base_dir, "config", "aws.yml"))
+        self.regions = self.load_regions(base_dir / "config" / "aws.yml")
         self.imagesets = yaml.safe_load(
-            open(os.path.join(base_dir, "config", "imagesets.yml"))
+            (base_dir / "config" / "imagesets.yml").read_text()
         )
         logger.info("Loaded AWS configuration")
 
     def load_regions(self, path):
         """Load AWS regions from community tc file"""
-        aws = yaml.safe_load(open(path))
+        aws = yaml.safe_load(path.read_text())
         assert "subnets" in aws, "Missing subnets in AWS config"
         assert "security_groups" in aws, "Missing security_groups in AWS config"
         assert (
@@ -95,7 +95,7 @@ class GCP(object):
 
     def __init__(self, base_dir):
         # Load configuration from cloned community config
-        gcp_config = yaml.safe_load(open(os.path.join(base_dir, "config", "gcp.yml")))
+        gcp_config = yaml.safe_load((base_dir / "config" / "gcp.yml").read_text())
         assert "regions" in gcp_config, "Missing regions in gcp config"
         self.regions = {
             region: [f"{region}-{zone}" for zone in details["zones"]]
@@ -103,7 +103,7 @@ class GCP(object):
         }
 
         self.imagesets = yaml.safe_load(
-            open(os.path.join(base_dir, "config", "imagesets.yml"))
+            (base_dir / "config" / "imagesets.yml").read_text()
         )
         logger.info("Loaded GCP configuration")
 

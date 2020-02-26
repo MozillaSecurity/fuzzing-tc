@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import json
-import os
+import pathlib
 from unittest.mock import Mock
 
 import pytest
@@ -12,7 +12,7 @@ from fuzzing_tc.decision.providers import AWS
 from fuzzing_tc.decision.providers import GCP
 from fuzzing_tc.decision.workflow import Workflow
 
-FIXTURES_DIR = os.path.join(os.path.dirname(__file__), "fixtures")
+FIXTURES_DIR = pathlib.Path(__file__).parent / "fixtures"
 
 
 @pytest.fixture
@@ -40,15 +40,15 @@ def mock_taskcluster_workflow():
 @pytest.fixture
 def mock_clouds():
     """Mock Cloud providers setup"""
-    community = os.path.join(FIXTURES_DIR, "community")
+    community = FIXTURES_DIR / "community"
     return {"aws": AWS(community), "gcp": GCP(community)}
 
 
 @pytest.fixture
 def mock_machines():
     """Mock a static list of machines"""
-    path = os.path.join(FIXTURES_DIR, "machines.yml")
-    assert os.path.exists(path)
+    path = FIXTURES_DIR / "machines.yml"
+    assert path.exists()
     return MachineTypes.from_file(path)
 
 

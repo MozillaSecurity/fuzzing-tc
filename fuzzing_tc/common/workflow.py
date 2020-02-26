@@ -5,7 +5,7 @@
 # obtain one at http://mozilla.org/MPL/2.0/.
 
 import logging
-import os
+import pathlib
 import subprocess
 import tempfile
 
@@ -33,8 +33,8 @@ class Workflow:
         """Load configuration either from local file or Taskcluster secret"""
 
         if local_path is not None:
-            assert os.path.exists(local_path), f"Missing configuration in {local_path}"
-            config = yaml.safe_load(open(local_path))
+            assert local_path.is_file(), f"Missing configuration in {local_path}"
+            config = yaml.safe_load(local_path.read_text())
 
         elif secret is not None:
             config = self.taskcluster.load_secrets(secret)
@@ -69,27 +69,27 @@ class Workflow:
         # Setup ssh private key if any
         private_key = config.get("private_key")
         if private_key is not None:
-            path = os.path.expanduser("~/.ssh/id_rsa")
-            assert not os.path.exists(path), f"Existing ssh key found at {path}"
-            with open(path, "w") as f:
-                f.write(private_key)
-            os.chmod(path, 0o400)
+            path = pathlib.Path("~/.ssh/id_rsa").expanduser()
+            assert not path.exists(), f"Existing ssh key found at {path}"
+            path.write_text(private_key)
+            path.chmod(0o400)
             logger.info("Installed ssh private key")
 
     def git_clone(self, url=None, path=None, revision=None, **kwargs):
         """Clone a configuration repository"""
         if path is not None:
+            path = pathlib.Path(path)
             # Use local path when available
-            assert os.path.isdir(path), "Invalid repo dir {path}"
+            assert path.is_dir(), f"Invalid repo dir {path}"
             logger.info(f"Using local configuration in {path}")
 
         elif url is not None:
             # Clone from remote repository
-            path = tempfile.mkdtemp(suffix=url[url.rindex("/") + 1 :])
+            path = pathlib.Path(tempfile.mkdtemp(suffix=url[url.rindex("/") + 1 :]))
 
             # Clone the configuration repository
             logger.info(f"Cloning {url}")
-            cmd = ["git", "clone", "--quiet", url, path]
+            cmd = ["git", "clone", "--quiet", url, str(path)]
             subprocess.check_output(cmd)
             logger.info(f"Using cloned config files in {path}")
         else:
@@ -101,11 +101,11 @@ class Workflow:
             logger.info(f"Updating repo to {revision}")
             try:
                 cmd = ["git", "checkout", revision, "-q"]
-                subprocess.check_output(cmd, cwd=path)
+                subprocess.check_output(cmd, cwd=str(path))
 
             except subprocess.CalledProcessError:
                 logger.info("Updating failed, trying to pull")
                 cmd = ["git", "pull", "origin", revision, "-q"]
-                subprocess.check_output(cmd, cwd=path)
+                subprocess.check_output(cmd, cwd=str(path))
 
         return path

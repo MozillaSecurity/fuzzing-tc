@@ -4,7 +4,7 @@
 # v. 2.0. If a copy of the MPL was not distributed with this file, You can
 # obtain one at http://mozilla.org/MPL/2.0/.
 
-import os
+import pathlib
 import re
 
 import yaml
@@ -63,8 +63,8 @@ class MachineTypes:
 
     @classmethod
     def from_file(cls, machines_yml):
-        with open(machines_yml) as machines_fp:
-            return cls(yaml.safe_load(machines_fp.read()))
+        assert machines_yml.is_file()
+        return cls(yaml.safe_load(machines_yml.read_text()))
 
     def cpus(self, provider, architecture, machine):
         return self._data[provider][architecture][machine]["cpu"]
@@ -243,10 +243,8 @@ class PoolConfiguration:
 
     @classmethod
     def from_file(cls, pool_yml, _flattened=None):
-        assert os.path.exists(pool_yml), "Invalid file"
-        filename, _ = os.path.splitext(os.path.basename(pool_yml))
-        with open(pool_yml) as pool_fd:
-            return cls(filename, yaml.safe_load(pool_fd), _flattened)
+        assert pool_yml.is_file()
+        return cls(pool_yml.stem, yaml.safe_load(pool_yml.read_text()), _flattened)
 
     @staticmethod
     def alias_cpu(cpu_name):
@@ -328,7 +326,7 @@ def test_main():
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("input", help="machines.yml")
+    parser.add_argument("input", type=pathlib.Path, help="machines.yml")
     parser.add_argument(
         "--cpu", help="cpu architecture", choices=ARCHITECTURES, default="x64"
     )

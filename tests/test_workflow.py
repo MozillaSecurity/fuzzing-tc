@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+import pathlib
 import re
 
 import pytest
@@ -13,15 +14,16 @@ fuzzing_config:
 """
 
 
-def test_patterns(tmpdir):
+def test_patterns(tmp_path):
 
     # Write community fuzzing config
-    conf = tmpdir.mkdir("config").mkdir("projects").join("fuzzing.yml")
-    conf.write(yaml.dump({"fuzzing": {"workerPools": {"pool-A": {}, "ci": {}}}}))
+    conf = tmp_path / "config" / "projects" / "fuzzing.yml"
+    conf.parent.mkdir(parents=True)
+    conf.write_text(yaml.dump({"fuzzing": {"workerPools": {"pool-A": {}, "ci": {}}}}))
 
     # Build resources patterns using that configuration
     workflow = Workflow()
-    workflow.community_config_dir = str(tmpdir)
+    workflow.community_config_dir = tmp_path
     patterns = workflow.build_resources_patterns()
     assert patterns == [
         "Hook=project-fuzzing/.*",
@@ -50,7 +52,7 @@ def test_configure_local(tmp_path):
 
     # Fails on missing file
     with pytest.raises(AssertionError, match="Missing configuration in nope.yml"):
-        workflow.configure(local_path="nope.yml")
+        workflow.configure(local_path=pathlib.Path("nope.yml"))
 
     # Read a local conf
     conf = tmp_path / "conf.yml"

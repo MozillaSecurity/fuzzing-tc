@@ -58,7 +58,7 @@ def test_load_params(tmp_path):
 
     # test 1: environment from pool is merged
     launcher = PoolLauncher(["command", "arg"], "test-pool")
-    launcher.fuzzing_config_dir = str(tmp_path)
+    launcher.fuzzing_config_dir = tmp_path
     with (tmp_path / "test-pool.yml").open("w") as test_cfg:
         yaml.dump(pool_data, stream=test_cfg)
 
@@ -74,7 +74,7 @@ def test_load_params(tmp_path):
     pool_data["macros"].clear()
     pool_data["command"] = ["new-command", "arg1", "arg2"]
     launcher = PoolLauncher([], "test-pool")
-    launcher.fuzzing_config_dir = str(tmp_path)
+    launcher.fuzzing_config_dir = tmp_path
     with (tmp_path / "test-pool.yml").open("w") as test_cfg:
         yaml.dump(pool_data, stream=test_cfg)
 
@@ -84,7 +84,7 @@ def test_load_params(tmp_path):
 
     # test 3: command from init and pool is error
     launcher = PoolLauncher(["command", "arg"], "test-pool")
-    launcher.fuzzing_config_dir = str(tmp_path)
+    launcher.fuzzing_config_dir = tmp_path
 
     with pytest.raises(AssertionError):
         launcher.load_params()

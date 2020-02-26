@@ -5,9 +5,8 @@
 # obtain one at http://mozilla.org/MPL/2.0/.
 
 import atexit
-import glob
 import logging
-import os
+import pathlib
 import shutil
 import tempfile
 
@@ -48,10 +47,14 @@ class Workflow(CommonWorkflow):
         """Setup the workflow to be usable by tc-admin"""
         appconfig = AppConfig.current()
 
+        local_path = appconfig.options.get("fuzzing_configuration")
+        if local_path is not None:
+            local_path = pathlib.Path(local_path)
+
         # Configure workflow using tc-admin options
         workflow = Workflow()
         config = workflow.configure(
-            local_path=appconfig.options.get("fuzzing_configuration"),
+            local_path=local_path,
             secret=appconfig.options.get("fuzzing_taskcluster_secret"),
             fuzzing_git_repository=appconfig.options.get("fuzzing_git_repository"),
             fuzzing_git_revision=appconfig.options.get("fuzzing_git_revision"),
@@ -84,13 +87,10 @@ class Workflow(CommonWorkflow):
         }
 
         # Load the machine types
-        machines = MachineTypes.from_file(
-            os.path.join(self.fuzzing_config_dir, "machines.yml")
-        )
+        machines = MachineTypes.from_file(self.fuzzing_config_dir / "machines.yml")
 
         # Browse the files in the repo
-        fuzzing_glob = os.path.join(self.fuzzing_config_dir, "pool*.yml")
-        for config_file in glob.glob(fuzzing_glob):
+        for config_file in self.fuzzing_config_dir.glob("pool*.yml"):
 
             pool_config = PoolConfiguration.from_file(config_file)
 
@@ -100,9 +100,9 @@ class Workflow(CommonWorkflow):
         """Build regex patterns to manage our resources"""
 
         # Load existing workerpools from community config
-        path = os.path.join(self.community_config_dir, "config/projects/fuzzing.yml")
-        assert os.path.exists(path), f"Missing fuzzing community config in {path}"
-        community = yaml.safe_load(open(path))
+        path = self.community_config_dir / "config" / "projects" / "fuzzing.yml"
+        assert path.exists(), f"Missing fuzzing community config in {path}"
+        community = yaml.safe_load(path.read_text())
         assert "fuzzing" in community, "Missing fuzzing main key in community config"
 
         def _suffix(data, key):
@@ -130,8 +130,8 @@ class Workflow(CommonWorkflow):
         ]
 
     def build_tasks(self, pool_name, task_id):
-        path = os.path.join(self.fuzzing_config_dir, f"{pool_name}.yml")
-        assert os.path.exists(path), f"Missing pool {pool_name}"
+        path = self.fuzzing_config_dir / f"{pool_name}.yml"
+        assert path.exists(), f"Missing pool {pool_name}"
 
         # Build tasks needed for a specific pool
         pool_config = PoolConfiguration.from_file(path)
@@ -146,8 +146,9 @@ class Workflow(CommonWorkflow):
     def cleanup(self):
         """Cleanup temporary folders at end of execution"""
         for folder in (self.community_config_dir, self.fuzzing_config_dir):
-            if folder is None or not os.path.exists(folder):
+            if folder is None or not folder.exists():
                 continue
+            folder = str(folder)
             if folder.startswith(tempfile.gettempdir()):
                 logger.info(f"Removing tempdir clone {folder}")
                 shutil.rmtree(folder)
