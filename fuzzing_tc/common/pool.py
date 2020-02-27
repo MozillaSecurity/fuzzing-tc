@@ -6,28 +6,30 @@
 
 import pathlib
 import re
+import types
 
 import yaml
 
-FIELDS = frozenset(
-    (
-        "cloud",
-        "command",
-        "container",
-        "cores_per_task",
-        "cpu",
-        "cycle_time",
-        "disk_size",
-        "imageset",
-        "macros",
-        "metal",
-        "minimum_memory_per_core",
-        "name",
-        "parents",
-        "platform",
-        "scopes",
-        "tasks",
-    )
+# fields that must exist in pool.yml, and their types
+FIELD_TYPES = types.MappingProxyType(
+    {
+        "cloud": str,
+        "command": list,
+        "container": str,
+        "cores_per_task": int,
+        "cpu": str,
+        "cycle_time": str,
+        "disk_size": str,
+        "imageset": str,
+        "macros": dict,
+        "metal": bool,
+        "minimum_memory_per_core": str,
+        "name": str,
+        "parents": list,
+        "platform": str,
+        "scopes": list,
+        "tasks": int,
+    }
 )
 CPU_ALIASES = {
     "x86_64": "x64",
@@ -109,18 +111,35 @@ class PoolConfiguration:
         name (str): descriptive name of the configuration
         parents (list): list of parents to inherit from
         platform (str): operating system of the target (linux, windows)
+        pool_id (str): basename of the pool on disk (eg. "pool1" for pool1.yml)
         scopes (list): list of taskcluster scopes required by the target
         tasks (int): number of tasks to run (each with `cores_per_task`)
     """
 
-    def __init__(self, filename, data, _flattened=None):
-        missing = list(set(data) - FIELDS)
-        extra = list(FIELDS - set(data))
+    def __init__(self, pool_id, data, base_dir=None, _flattened=None):
+        missing = list(set(data) - set(FIELD_TYPES))
+        extra = list(set(FIELD_TYPES) - set(data))
         assert not missing, f"configuration is missing fields: {missing!r}"
         assert not extra, f"configuration has extra fields: {extra!r}"
 
         # "normal" fields
-        self.filename = filename
+        self.pool_id = pool_id
+        self.base_dir = base_dir or pathlib.Path.cwd()
+
+        # check that all fields are of the right type (or None)
+        for field, cls in FIELD_TYPES.items():
+            if data[field] is not None:
+                assert isinstance(
+                    data[field], cls
+                ), f"expected '{field}' to be '{cls.__name__}', got '{type(data[field]).__name__}'"
+        for key, value in data["macros"].items():
+            assert isinstance(
+                key, str
+            ), f"expected macro '{key!r}' name to be 'str', got '{type(key).__name__}'"
+            assert isinstance(
+                value, str
+            ), f"expected macro '{key}' value to be 'str', got '{type(value).__name__}'"
+
         self.container = data["container"]
         self.cores_per_task = data["cores_per_task"]
         self.imageset = data["imageset"]
@@ -134,9 +153,9 @@ class PoolConfiguration:
         self.macros = data["macros"].copy()
 
         # list fields
-        self.command = data["command"][:]
-        self.parents = data["parents"][:]
-        self.scopes = data["scopes"][:]
+        self.command = data["command"].copy()
+        self.parents = data["parents"].copy()
+        self.scopes = data["scopes"].copy()
 
         # size fields
         self.minimum_memory_per_core = self.disk_size = None
@@ -161,30 +180,27 @@ class PoolConfiguration:
             assert cpu in ARCHITECTURES
             self.cpu = cpu
 
-        assert "cloud" in data, "Missing cloud configuration"
-        assert data["cloud"] in PROVIDERS, "Invalid cloud - use {}".format(
-            ",".join(PROVIDERS)
-        )
+        if data["cloud"] is not None:
+            assert data["cloud"] in PROVIDERS, "Invalid cloud - use {}".format(
+                ",".join(PROVIDERS)
+            )
         self.cloud = data["cloud"]
 
         if _flattened is None:
-            _flattened = set()
+            _flattened = {self.pool_id}
         self._flatten(_flattened)
 
-        # Build pool id
-        self.id = f"{self.platform}-{self.filename}"
-
-    def is_complete(self):
-        for field in FIELDS:
-            assert getattr(self, field) is not None
+    def assert_complete(self):
+        missing = {field for field in FIELD_TYPES if getattr(self, field) is None}
+        assert not missing, f"Pool is missing fields: {list(missing)!r}"
 
     def _flatten(self, flattened):
-        for parent in self.parents:
+        for parent_id in self.parents:
             assert (
-                parent not in flattened
-            ), f"attempt to resolve cyclic configuration, {parent} already encountered"
-            flattened.add(parent)
-            parent_obj = self.from_file(parent, flattened)
+                parent_id not in flattened
+            ), f"attempt to resolve cyclic configuration, {parent_id} already encountered"
+            flattened.add(parent_id)
+            parent_obj = self.from_file(self.base_dir / f"{parent_id}.yml", flattened)
 
             # "normal" overwriting fields
             for field in (
@@ -206,22 +222,20 @@ class PoolConfiguration:
 
             # merged dict fields
             for field in ("macros",):
-                copy = getattr(parent_obj, field).copy()
-                copy.update(getattr(self, field))
-                setattr(self, field, copy)
+                getattr(self, field).update(getattr(parent_obj, field))
 
             # merged list fields
             for field in ("scopes",):
                 setattr(
                     self,
                     field,
-                    list(set(getattr(self, field)) + set(getattr(parent_obj, field))),
+                    list(set(getattr(self, field)) | set(getattr(parent_obj, field))),
                 )
 
             # overwriting list fields
             for field in ("command",):
                 if not getattr(self, field):
-                    setattr(self, field, getattr(parent_obj, field)[:])
+                    setattr(self, field, getattr(parent_obj, field).copy())
 
     def get_machine_list(self, machine_types):
         """
@@ -244,7 +258,12 @@ class PoolConfiguration:
     @classmethod
     def from_file(cls, pool_yml, _flattened=None):
         assert pool_yml.is_file()
-        return cls(pool_yml.stem, yaml.safe_load(pool_yml.read_text()), _flattened)
+        return cls(
+            pool_yml.stem,
+            yaml.safe_load(pool_yml.read_text()),
+            base_dir=pool_yml.parent,
+            _flattened=_flattened,
+        )
 
     @staticmethod
     def alias_cpu(cpu_name):

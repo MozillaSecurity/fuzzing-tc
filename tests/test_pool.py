@@ -5,7 +5,9 @@ from datetime import datetime
 
 import pytest
 import slugid
+import yaml
 
+from fuzzing_tc.common.pool import PoolConfiguration as CommonPoolConfiguration
 from fuzzing_tc.decision.pool import PoolConfiguration
 
 
@@ -137,7 +139,7 @@ def test_aws_resources(env, mock_clouds, mock_machines):
             "metal": False,
             "name": "Amazing fuzzing pool",
             "tasks": 3,
-            "command": "run-fuzzing.sh",
+            "command": ["run-fuzzing.sh"],
             "container": "MozillaSecurity/fuzzer:latest",
             "minimum_memory_per_core": "1g",
             "imageset": "generic-worker-A",
@@ -213,7 +215,7 @@ def test_gcp_resources(env, mock_clouds, mock_machines):
             "metal": False,
             "name": "Amazing fuzzing pool",
             "tasks": 3,
-            "command": "run-fuzzing.sh",
+            "command": ["run-fuzzing.sh"],
             "container": "MozillaSecurity/fuzzer:latest",
             "minimum_memory_per_core": "1g",
             "imageset": "docker-worker",
@@ -314,7 +316,7 @@ def test_tasks(env):
             "metal": False,
             "name": "Amazing fuzzing pool",
             "tasks": 2,
-            "command": "run-fuzzing.sh",
+            "command": ["run-fuzzing.sh"],
             "container": "MozillaSecurity/fuzzer:latest",
             "minimum_memory_per_core": "1g",
             "imageset": "anything",
@@ -396,3 +398,66 @@ def test_tasks(env):
             "taskGroupId": "someTaskId",
             "workerType": "linux-test",
         }
+
+
+def test_flatten(tmp_path):
+    pool_data1 = {
+        "cloud": "aws",
+        "scopes": ["scope1"],
+        "disk_size": "120g",
+        "cycle_time": "1h",
+        "cores_per_task": 10,
+        "metal": False,
+        "name": "parent",
+        "tasks": 3,
+        "command": ["cmd1", "arg1"],
+        "container": "MozillaSecurity/fuzzer:latest",
+        "minimum_memory_per_core": "1g",
+        "imageset": "generic-worker-A",
+        "parents": [],
+        "cpu": "arm64",
+        "platform": "linux",
+        "macros": {"ENVVAR1": "123456", "ENVVAR2": "789abc"},
+    }
+    pool_data2 = {
+        "cloud": None,
+        "scopes": ["scope2"],
+        "disk_size": None,
+        "cycle_time": "2h",
+        "cores_per_task": None,
+        "metal": None,
+        "name": "child",
+        "tasks": None,
+        "command": ["cmd2", "arg2"],
+        "container": None,
+        "minimum_memory_per_core": None,
+        "imageset": None,
+        "parents": ["pool1"],
+        "cpu": None,
+        "platform": None,
+        "macros": {"ENVVAR3": "defghi"},
+    }
+    (tmp_path / "pool1.yml").write_text(yaml.dump(pool_data1))
+    (tmp_path / "pool2.yml").write_text(yaml.dump(pool_data2))
+
+    pool = CommonPoolConfiguration.from_file(tmp_path / "pool2.yml")
+    assert pool.cloud == "aws"
+    assert set(pool.scopes) == {"scope1", "scope2"}
+    assert pool.disk_size == 120
+    assert pool.cycle_time == 7200
+    assert pool.cores_per_task == 10
+    assert pool.metal is False
+    assert pool.name == "child"
+    assert pool.tasks == 3
+    assert pool.command == ["cmd2", "arg2"]
+    assert pool.container == "MozillaSecurity/fuzzer:latest"
+    assert pool.minimum_memory_per_core == 1.0
+    assert pool.imageset == "generic-worker-A"
+    assert pool.parents == ["pool1"]
+    assert pool.cpu == "arm64"
+    assert pool.platform == "linux"
+    assert pool.macros == {
+        "ENVVAR1": "123456",
+        "ENVVAR2": "789abc",
+        "ENVVAR3": "defghi",
+    }

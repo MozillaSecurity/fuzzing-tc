@@ -99,6 +99,7 @@ class Workflow(CommonWorkflow):
         for config_file in self.fuzzing_config_dir.glob("pool*.yml"):
 
             pool_config = PoolConfiguration.from_file(config_file)
+            pool_config.assert_complete()
 
             resources.update(pool_config.build_resources(clouds, machines, env))
 
@@ -147,6 +148,7 @@ class Workflow(CommonWorkflow):
 
         # Build tasks needed for a specific pool
         pool_config = PoolConfiguration.from_file(path)
+        pool_config.assert_complete()
         tasks = pool_config.build_tasks(task_id, env)
 
         # Create all the tasks on taskcluster

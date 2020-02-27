@@ -46,9 +46,15 @@ class PoolConfiguration(CommonPoolConfiguration):
         name (str): descriptive name of the configuration
         parents (list): list of parents to inherit from
         platform (str): operating system of the target (linux, windows)
+        pool_id (str): basename of the pool on disk (eg. "pool1" for pool1.yml)
         scopes (list): list of taskcluster scopes required by the target
+        task_id (str): ID to use to refer to the task in Taskcluster
         tasks (int): number of tasks to run (each with `cores_per_task`)
     """
+
+    @property
+    def task_id(self):
+        return f"{self.platform}-{self.pool_id}"
 
     def build_resources(self, providers, machine_types, env=None):
         """Build the full tc-admin resources to compare and build the pool"""
@@ -71,7 +77,7 @@ class PoolConfiguration(CommonPoolConfiguration):
         # or create new tasks
         decision_task_scopes = (
             f"queue:scheduler-id:{SCHEDULER_ID}",
-            f"queue:create-task:highest:{PROVISIONER_ID}/{self.id}",
+            f"queue:create-task:highest:{PROVISIONER_ID}/{self.task_id}",
             f"secrets:get:{DECISION_TASK_SECRET}",
         )
 
@@ -83,7 +89,7 @@ class PoolConfiguration(CommonPoolConfiguration):
             "extra": {},
             "metadata": {
                 "description": DESCRIPTION,
-                "name": f"Fuzzing decision {self.id}",
+                "name": f"Fuzzing decision {self.task_id}",
                 "owner": OWNER_EMAIL,
                 "source": "https://github.com/MozillaSecurity/fuzzing-tc",
             },
@@ -98,12 +104,12 @@ class PoolConfiguration(CommonPoolConfiguration):
                     "path": "public/fuzzing-tc-decision.tar",
                     "namespace": "project.fuzzing.config.master",
                 },
-                "command": ["fuzzing-decision", self.filename],
+                "command": ["fuzzing-decision", self.pool_id],
                 "maxRunTime": 3600,
             },
             "priority": "high",
             "provisionerId": PROVISIONER_ID,
-            "workerType": self.id,
+            "workerType": self.task_id,
             "retries": 1,
             "routes": [],
             "schedulerId": SCHEDULER_ID,
@@ -117,7 +123,7 @@ class PoolConfiguration(CommonPoolConfiguration):
             decision_task["payload"]["env"].update(env)
 
         pool = WorkerPool(
-            workerPoolId=f"{WORKER_POOL_PREFIX}/{self.id}",
+            workerPoolId=f"{WORKER_POOL_PREFIX}/{self.task_id}",
             providerId=PROVIDER_IDS[self.cloud],
             description=DESCRIPTION,
             owner=OWNER_EMAIL,
@@ -127,8 +133,8 @@ class PoolConfiguration(CommonPoolConfiguration):
 
         hook = Hook(
             hookGroupId=HOOK_PREFIX,
-            hookId=self.id,
-            name=self.id,
+            hookId=self.task_id,
+            name=self.task_id,
             description="Generated Fuzzing hook",
             owner=OWNER_EMAIL,
             emailOnError=True,
@@ -139,7 +145,7 @@ class PoolConfiguration(CommonPoolConfiguration):
         )
 
         role = Role(
-            roleId=f"hook-id:{HOOK_PREFIX}/{self.id}",
+            roleId=f"hook-id:{HOOK_PREFIX}/{self.task_id}",
             description=DESCRIPTION,
             scopes=tuple(self.scopes) + decision_task_scopes,
         )
@@ -160,7 +166,7 @@ class PoolConfiguration(CommonPoolConfiguration):
                 "extra": {},
                 "metadata": {
                     "description": DESCRIPTION,
-                    "name": f"Fuzzing task {self.id} - {i}/{self.tasks}",
+                    "name": f"Fuzzing task {self.task_id} - {i}/{self.tasks}",
                     "owner": OWNER_EMAIL,
                     "source": "https://github.com/MozillaSecurity/fuzzing-tc",
                 },
@@ -174,14 +180,14 @@ class PoolConfiguration(CommonPoolConfiguration):
                     },
                     "cache": {},
                     "capabilities": {},
-                    "env": {"TASKCLUSTER_FUZZING_POOL": self.filename},
+                    "env": {"TASKCLUSTER_FUZZING_POOL": self.pool_id},
                     "features": {"taskclusterProxy": True},
                     "image": self.container,
                     "maxRunTime": self.cycle_time,
                 },
                 "priority": "high",
                 "provisionerId": PROVISIONER_ID,
-                "workerType": self.id,
+                "workerType": self.task_id,
                 "retries": 1,
                 "routes": [],
                 "schedulerId": SCHEDULER_ID,

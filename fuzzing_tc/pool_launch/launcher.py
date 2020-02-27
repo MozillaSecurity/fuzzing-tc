@@ -7,6 +7,7 @@
 import ctypes
 import logging
 import os
+import pathlib
 import sys
 
 from ..common.pool import PoolConfiguration
@@ -25,7 +26,7 @@ class PoolLauncher(Workflow):
         self.command = command.copy()
         self.environment = os.environ.copy()
         self.pool_name = pool_name
-        self.log_dir = "/logs"
+        self.log_dir = pathlib.Path("/logs")
 
     def clone(self, config):
         """Clone remote repositories according to current setup"""
@@ -40,6 +41,7 @@ class PoolLauncher(Workflow):
 
         # Build tasks needed for a specific pool
         pool_config = PoolConfiguration.from_file(path)
+        pool_config.assert_complete()
 
         if pool_config.command:
             assert not self.command, "Specify command-line args XOR pool.command"
@@ -51,17 +53,17 @@ class PoolLauncher(Workflow):
 
         if self.in_taskcluster:
             logging.info(f"Creating private logs directory '{self.log_dir}/'")
-            if os.path.isdir(self.log_dir):
-                os.chmod(self.log_dir, 0o777)
+            if self.log_dir.is_dir():
+                self.log_dir.chmod(0o777)
             else:
-                os.mkdir(self.log_dir, mode=0o777)
+                self.log_dir.mkdir(mode=0o777)
             logging.info(f"Redirecting stdout/stderr to {self.log_dir}/live.log")
             sys.stdout.flush()
             sys.stderr.flush()
 
             # redirect stdout/stderr to a log file
             # not sure if the assertions would print
-            with open(os.path.join(self.log_dir, "live.log"), "w") as log:
+            with (self.log_dir / "live.log").open("w") as log:
                 result = os.dup2(log.fileno(), 1)
                 assert result != -1, "dup2 failed: " + os.strerror(ctypes.get_errno())
                 result = os.dup2(log.fileno(), 2)
