@@ -354,7 +354,10 @@ def test_tasks(env):
         deadline = _check_date(task, "deadline")
         expires = _check_date(task, "expires")
         assert expires >= deadline > created
-        expected_env = {"TASKCLUSTER_FUZZING_POOL": "test"}
+        expected_env = {
+            "TASKCLUSTER_FUZZING_POOL": "test",
+            "TASKCLUSTER_SECRET": "project/fuzzing/decision",
+        }
         if env is not None:
             expected_env.update(env)
 
@@ -393,7 +396,7 @@ def test_tasks(env):
             "retries": 1,
             "routes": [],
             "schedulerId": "-",
-            "scopes": [],
+            "scopes": ["secrets:get:project/fuzzing/decision"],
             "tags": {},
             "taskGroupId": "someTaskId",
             "workerType": "linux-test",

@@ -113,7 +113,7 @@ class PoolConfiguration(CommonPoolConfiguration):
             "retries": 1,
             "routes": [],
             "schedulerId": SCHEDULER_ID,
-            "scopes": decision_task_scopes,
+            "scopes": tuple(self.scopes) + decision_task_scopes,
             "tags": {},
         }
         if env is not None:
@@ -180,7 +180,10 @@ class PoolConfiguration(CommonPoolConfiguration):
                     },
                     "cache": {},
                     "capabilities": {},
-                    "env": {"TASKCLUSTER_FUZZING_POOL": self.pool_id},
+                    "env": {
+                        "TASKCLUSTER_FUZZING_POOL": self.pool_id,
+                        "TASKCLUSTER_SECRET": DECISION_TASK_SECRET,
+                    },
                     "features": {"taskclusterProxy": True},
                     "image": self.container,
                     "maxRunTime": self.cycle_time,
@@ -191,7 +194,7 @@ class PoolConfiguration(CommonPoolConfiguration):
                 "retries": 1,
                 "routes": [],
                 "schedulerId": SCHEDULER_ID,
-                "scopes": self.scopes,
+                "scopes": self.scopes + [f"secrets:get:{DECISION_TASK_SECRET}"],
                 "tags": {},
             }
             if env is not None:
