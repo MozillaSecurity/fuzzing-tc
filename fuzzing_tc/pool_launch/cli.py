@@ -19,7 +19,7 @@ def main(args=None):
         "--pool-name",
         type=str,
         help="The target fuzzing pool to create tasks for",
-        default=os.environ.get("FUZZING_POOL"),
+        default=os.environ.get("TASKCLUSTER_FUZZING_POOL"),
     )
     parser.add_argument("command", help="docker command-line", nargs=argparse.REMAINDER)
     args = parser.parse_args(args=args)
