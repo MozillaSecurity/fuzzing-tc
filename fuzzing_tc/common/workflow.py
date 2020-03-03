@@ -74,7 +74,9 @@ class Workflow:
         # Setup ssh private key if any
         private_key = config.get("private_key")
         if private_key is not None:
-            path = pathlib.Path("~/.ssh/id_rsa").expanduser()
+            ssh_path = pathlib.Path("~/.ssh").expanduser()
+            ssh_path.mkdir(mode=0o700, exist_ok=True)
+            path = ssh_path / "id_rsa"
             assert not path.exists(), f"Existing ssh key found at {path}"
             path.write_text(private_key)
             path.chmod(0o400)
