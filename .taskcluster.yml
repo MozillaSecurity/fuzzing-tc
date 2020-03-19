@@ -112,7 +112,7 @@ tasks:
           - Dockerfile
         artifacts:
           public/fuzzing-tc-decision.tar:
-            expires: {$fromNow: '2 weeks'}
+            expires: {$fromNow: '6 months'}
             path: /decision.tar
             type: file
       routes:
