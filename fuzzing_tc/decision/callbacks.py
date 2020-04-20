@@ -6,6 +6,7 @@
 
 import logging
 
+from tcadmin.resources import Hook
 from tcadmin.resources import WorkerPool
 
 from fuzzing_tc.common import taskcluster
@@ -41,3 +42,12 @@ async def cancel_pool_tasks(action, resource):
         # Cancel the task
         logger.info(f"Cancelling task {task_id}")
         queue.cancel(task_id)
+
+
+async def trigger_hook(action, resource):
+    """Trigger a Hook after it is created or updated"""
+    assert isinstance(resource, Hook)
+
+    hooks = taskcluster.get_service("hooks")
+    logger.info(f"Triggering hook {resource.hookGroupId} / {resource.hookId}")
+    hooks.triggerHook(resource.hookGroupId, resource.hookId, {})

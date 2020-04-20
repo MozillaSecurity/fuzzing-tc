@@ -7,9 +7,11 @@
 import os
 
 from tcadmin.appconfig import AppConfig
+from tcadmin.resources import Hook
 from tcadmin.resources import WorkerPool
 
 from fuzzing_tc.decision.callbacks import cancel_pool_tasks
+from fuzzing_tc.decision.callbacks import trigger_hook
 from fuzzing_tc.decision.workflow import Workflow
 
 appconfig = AppConfig()
@@ -45,4 +47,7 @@ appconfig.callbacks.add(
     cancel_pool_tasks,
     actions=["update", "delete"],
     resources=[WorkerPool],
+)
+appconfig.callbacks.add(
+    "after_apply", trigger_hook, actions=["create", "update"], resources=[Hook],
 )
