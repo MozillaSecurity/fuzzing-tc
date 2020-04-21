@@ -11,18 +11,15 @@ import subprocess
 import tempfile
 
 import yaml
-from taskcluster.helper import TaskclusterConfig
+
+from fuzzing_tc.common import taskcluster
 
 logger = logging.getLogger()
 
 
 class Workflow:
     def __init__(self):
-        # Shared taskcluster configuration
-        self.taskcluster = TaskclusterConfig(
-            "https://community-tc.services.mozilla.com"
-        )
-        self.taskcluster.auth()
+        taskcluster.auth()
 
     @property
     def in_taskcluster(self):
@@ -42,7 +39,7 @@ class Workflow:
             config = yaml.safe_load(local_path.read_text())
 
         elif secret is not None:
-            config = self.taskcluster.load_secrets(secret)
+            config = taskcluster.load_secrets(secret)
 
         else:
             return None

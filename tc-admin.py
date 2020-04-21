@@ -7,7 +7,9 @@
 import os
 
 from tcadmin.appconfig import AppConfig
+from tcadmin.resources import WorkerPool
 
+from fuzzing_tc.decision.callbacks import cancel_pool_tasks
 from fuzzing_tc.decision.workflow import Workflow
 
 appconfig = AppConfig()
@@ -38,3 +40,9 @@ os.environ["TASKCLUSTER_ROOT_URL"] = "https://community-tc.services.mozilla.com"
 
 # Setup our workflow as resource generetor
 appconfig.generators.register(Workflow.tc_admin_boot)
+appconfig.callbacks.add(
+    "before_apply",
+    cancel_pool_tasks,
+    actions=["update", "delete"],
+    resources=[WorkerPool],
+)

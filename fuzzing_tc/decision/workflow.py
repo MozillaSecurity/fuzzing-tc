@@ -13,6 +13,7 @@ import tempfile
 import yaml
 from tcadmin.appconfig import AppConfig
 
+from ..common import taskcluster
 from ..common.pool import MachineTypes
 from ..common.workflow import Workflow as CommonWorkflow
 from . import HOOK_PREFIX
@@ -152,7 +153,7 @@ class Workflow(CommonWorkflow):
         tasks = pool_config.build_tasks(task_id, env)
 
         # Create all the tasks on taskcluster
-        queue = self.taskcluster.get_service("queue")
+        queue = taskcluster.get_service("queue")
         for task_id, task in tasks:
             logger.info(f"Creating task {task['metadata']['name']} as {task_id}")
             queue.createTask(task_id, task)

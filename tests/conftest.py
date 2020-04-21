@@ -3,10 +3,12 @@
 import json
 import pathlib
 from unittest.mock import Mock
+from unittest.mock import patch
 
 import pytest
 import responses
 
+from fuzzing_tc.common import taskcluster
 from fuzzing_tc.common.pool import MachineTypes
 from fuzzing_tc.decision.providers import AWS
 from fuzzing_tc.decision.providers import GCP
@@ -20,7 +22,6 @@ def mock_taskcluster_workflow():
     """Mock Taskcluster HTTP services"""
 
     workflow = Workflow()
-    workflow.taskcluster.options = {"rootUrl": "http://taskcluster.test"}
 
     # Add a basic configuration for the workflow in a secret
     secret = {
@@ -34,7 +35,8 @@ def mock_taskcluster_workflow():
         body=json.dumps({"secret": secret}),
         content_type="application/json",
     )
-    return workflow
+    with patch.dict(taskcluster.options, {"rootUrl": "http://taskcluster.test"}):
+        yield workflow
 
 
 @pytest.fixture
