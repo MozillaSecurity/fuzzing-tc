@@ -509,12 +509,24 @@ def test_cycle_crons():
 
     # cycle time 17h
     conf.cycle_time = 3600 * 17
-    assert len(list(conf.cycle_crons(0))) == (366 * 24 // 17)
+    crons = list(conf.cycle_crons(0))
+    assert len(crons) == (365 * 24 // 17) + 1
+    assert crons[:4] == ["0 0 17 1 1 *", "0 0 10 2 1 *", "0 0 3 3 1 *", "0 0 20 3 1 *"]
 
     # cycle time 48h
     conf.cycle_time = 3600 * 48
-    assert len(list(conf.cycle_crons(0))) == (366 * 24 // 48)
+    crons = list(conf.cycle_crons(0))
+    assert len(crons) == (365 * 24 // 48) + 1
+    assert crons[:4] == ["0 0 0 3 1 *", "0 0 0 5 1 *", "0 0 0 7 1 *", "0 0 0 9 1 *"]
 
     # cycle time 72h
     conf.cycle_time = 3600 * 72
-    assert len(list(conf.cycle_crons(0))) == (366 * 24 // 72)
+    crons = list(conf.cycle_crons(0))
+    assert len(crons) == (365 * 24 // 72) + 1
+    assert crons[:4] == ["0 0 0 4 1 *", "0 0 0 7 1 *", "0 0 0 10 1 *", "0 0 0 13 1 *"]
+
+    # cycle time 17d
+    conf.cycle_time = 3600 * 24 * 17
+    crons = list(conf.cycle_crons(0))
+    assert len(crons) == (365 // 17) + 1
+    assert crons[:4] == ["0 0 0 18 1 *", "0 0 0 4 2 *", "0 0 0 21 2 *", "0 0 0 10 3 *"]
