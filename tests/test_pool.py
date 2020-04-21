@@ -6,6 +6,7 @@ from datetime import datetime
 import pytest
 import slugid
 import yaml
+from freezegun import freeze_time
 
 from fuzzing_tc.common.pool import PoolConfiguration as CommonPoolConfiguration
 from fuzzing_tc.decision.pool import PoolConfiguration
@@ -62,7 +63,7 @@ VALID_HOOK = {
     "hookId": "linux-test",
     "name": "linux-test",
     "owner": "fuzzing+taskcluster@mozilla.com",
-    "schedule": [],
+    "schedule": ["0 0 12 * * *", "0 0 0 * * *"],
     "task": {
         "created": {"$fromNow": "0 seconds"},
         "deadline": {"$fromNow": "1 hour"},
@@ -134,7 +135,7 @@ def test_aws_resources(env, mock_clouds, mock_machines):
             "cloud": "aws",
             "scopes": [],
             "disk_size": "120g",
-            "cycle_time": "1h",
+            "cycle_time": "12h",
             "cores_per_task": 10,
             "metal": False,
             "name": "Amazing fuzzing pool",
@@ -149,7 +150,8 @@ def test_aws_resources(env, mock_clouds, mock_machines):
             "macros": {},
         },
     )
-    resources = conf.build_resources(mock_clouds, mock_machines, env=env)
+    with freeze_time("1970-01-01 00:00:00", tz_offset=0):
+        resources = conf.build_resources(mock_clouds, mock_machines, env=env)
     assert len(resources) == 3
     pool, hook, role = resources
 
@@ -210,7 +212,7 @@ def test_gcp_resources(env, mock_clouds, mock_machines):
             "cloud": "gcp",
             "scopes": [],
             "disk_size": "120g",
-            "cycle_time": "1h",
+            "cycle_time": "12h",
             "cores_per_task": 2,
             "metal": False,
             "name": "Amazing fuzzing pool",
@@ -225,7 +227,8 @@ def test_gcp_resources(env, mock_clouds, mock_machines):
             "macros": {},
         },
     )
-    resources = conf.build_resources(mock_clouds, mock_machines, env=env)
+    with freeze_time("1970-01-01 00:00:00", tz_offset=0):
+        resources = conf.build_resources(mock_clouds, mock_machines, env=env)
     assert len(resources) == 3
     pool, hook, role = resources
 
@@ -464,3 +467,54 @@ def test_flatten(tmp_path):
         "ENVVAR2": "789abc",
         "ENVVAR3": "defghi",
     }
+
+
+def test_cycle_crons():
+    conf = CommonPoolConfiguration(
+        "test",
+        {
+            "cloud": "gcp",
+            "scopes": [],
+            "disk_size": "10g",
+            "cycle_time": "6h",
+            "cores_per_task": 1,
+            "metal": False,
+            "name": "Amazing fuzzing pool",
+            "tasks": 2,
+            "command": ["run-fuzzing.sh"],
+            "container": "MozillaSecurity/fuzzer:latest",
+            "minimum_memory_per_core": "1g",
+            "imageset": "anything",
+            "parents": [],
+            "cpu": "x64",
+            "platform": "linux",
+            "macros": {},
+        },
+    )
+
+    # cycle time 6h
+    assert list(conf.cycle_crons(0)) == [
+        "0 0 6 * * *",
+        "0 0 12 * * *",
+        "0 0 18 * * *",
+        "0 0 0 * * *",
+    ]
+
+    # cycle time 3.5 days
+    conf.cycle_time = 3600 * 24 * 3.5
+    assert list(conf.cycle_crons(0)) == [
+        "0 0 12 * * 0",
+        "0 0 0 * * 4",
+    ]
+
+    # cycle time 17h
+    conf.cycle_time = 3600 * 17
+    assert len(list(conf.cycle_crons(0))) == (366 * 24 // 17)
+
+    # cycle time 48h
+    conf.cycle_time = 3600 * 48
+    assert len(list(conf.cycle_crons(0))) == (366 * 24 // 48)
+
+    # cycle time 72h
+    conf.cycle_time = 3600 * 72
+    assert len(list(conf.cycle_crons(0))) == (366 * 24 // 72)

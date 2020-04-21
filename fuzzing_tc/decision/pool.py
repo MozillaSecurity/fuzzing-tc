@@ -138,7 +138,7 @@ class PoolConfiguration(CommonPoolConfiguration):
             description="Generated Fuzzing hook",
             owner=OWNER_EMAIL,
             emailOnError=True,
-            schedule=(),  # TODO
+            schedule=list(self.cycle_crons()),
             task=decision_task,
             bindings=(),
             triggerSchema={},

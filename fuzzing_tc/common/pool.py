@@ -4,6 +4,7 @@
 # v. 2.0. If a copy of the MPL was not distributed with this file, You can
 # obtain one at http://mozilla.org/MPL/2.0/.
 
+import datetime
 import pathlib
 import re
 import types
@@ -254,6 +255,49 @@ class PoolConfiguration:
         ):
             cpus = machine_types.cpus(self.cloud, self.cpu, machine)
             yield (machine, cpus // self.cores_per_task)
+
+    def cycle_crons(self, start=None):
+        """Generate cron patterns that correspond to cycle_time (starting from now)
+
+        Args:
+            start (float): Unix timestamp to offset from (default to now)
+
+        Returns:
+            generator of str: One or more strings in simple cron format. If all patterns
+                              are installed, the result should correspond to cycle_time.
+        """
+        if start is not None:
+            assert isinstance(start, (float, int))
+            now = datetime.datetime.fromtimestamp(start, datetime.timezone.utc)
+        else:
+            now = datetime.datetime.now(datetime.timezone.utc)
+        interval = datetime.timedelta(seconds=self.cycle_time)
+
+        # special case if the cycle time is a factor of 24 hours
+        if (24 * 60 * 60) % self.cycle_time == 0:
+            stop = now + datetime.timedelta(days=1)
+            while now < stop:
+                now += interval
+                yield f"{now.second} {now.minute} {now.hour} * * *"
+            return
+
+        # special case if the cycle time is a factor of 7 days
+        if (7 * 24 * 60 * 60) % self.cycle_time == 0:
+            stop = now + datetime.timedelta(days=7)
+            while now < stop:
+                now += interval
+                weekday = now.isoweekday() % 7
+                yield f"{now.second} {now.minute} {now.hour} * * {weekday}"
+            return
+
+        # if the cycle can't be represented as a daily or weekly pattern, then it is
+        #   awkward to represent in cron format: resort to generating an annual schedule
+        # the cycle will glitch if it really runs for the full year, and either have
+        #   dead time or overlapping runs, happening once around the anniversary.
+        stop = now + datetime.timedelta(days=365)
+        while now < stop:
+            now += interval
+            yield f"{now.second} {now.minute} {now.hour} {now.day} {now.month} *"
 
     @classmethod
     def from_file(cls, pool_yml, _flattened=None):
