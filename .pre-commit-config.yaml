@@ -1,6 +1,6 @@
 repos:
   - repo: https://github.com/asottile/seed-isort-config
-    rev: v1.9.3
+    rev: v2.1.1
     hooks:
       - id: seed-isort-config
   - repo: https://github.com/pre-commit/mirrors-isort
@@ -8,11 +8,11 @@ repos:
     hooks:
       - id: isort
   - repo: https://github.com/ambv/black
-    rev: stable
+    rev: 19.10b0
     hooks:
     - id: black
   - repo: https://gitlab.com/pycqa/flake8
-    rev: 3.7.9
+    rev: 3.8.0a2
     hooks:
       - id: flake8
         additional_dependencies:
@@ -21,7 +21,7 @@ repos:
           - 'flake8-debugger==3.1.0'
           - 'flake8-mypy==17.8.0'
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v2.4.0
+    rev: v2.5.0
     hooks:
       - id: check-ast
       - id: check-docstring-first
@@ -42,11 +42,11 @@ repos:
       - id: codespell
         exclude_types: [json]
   - repo: https://github.com/marco-c/taskcluster_yml_validator
-    rev: v0.0.3
+    rev: v0.0.5
     hooks:
       - id: taskcluster_yml
   - repo: https://github.com/asottile/yesqa
-    rev: v0.0.11
+    rev: v1.1.0
     hooks:
       - id: yesqa
   - repo: meta
