@@ -71,6 +71,10 @@ class PoolConfiguration(CommonPoolConfiguration):
             "launchConfigs": provider.build_launch_configs(
                 self.imageset, machines, self.disk_size
             ),
+            "lifecycle": {
+                # give workers 15 minutes to register before assuming they're broken
+                "registrationTimeout": 900,
+            },
         }
 
         # Mandatory scopes to execute the hook
