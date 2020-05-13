@@ -89,7 +89,7 @@ class PoolConfiguration(CommonPoolConfiguration):
         decision_task = {
             "created": {"$fromNow": "0 seconds"},
             "deadline": {"$fromNow": "1 hour"},
-            "expires": {"$fromNow": "1 month"},
+            "expires": {"$fromNow": "1 week"},
             "extra": {},
             "metadata": {
                 "description": DESCRIPTION,
@@ -166,7 +166,7 @@ class PoolConfiguration(CommonPoolConfiguration):
                 "dependencies": [parent_task_id],
                 "created": stringDate(now),
                 "deadline": stringDate(now + timedelta(seconds=self.cycle_time)),
-                "expires": stringDate(fromNow("1 month", now)),
+                "expires": stringDate(fromNow("1 week", now)),
                 "extra": {},
                 "metadata": {
                     "description": DESCRIPTION,
@@ -177,7 +177,7 @@ class PoolConfiguration(CommonPoolConfiguration):
                 "payload": {
                     "artifacts": {
                         "project/fuzzing/private/logs": {
-                            "expires": stringDate(fromNow("1 month", now)),
+                            "expires": stringDate(fromNow("1 week", now)),
                             "path": "/logs/",
                             "type": "directory",
                         }

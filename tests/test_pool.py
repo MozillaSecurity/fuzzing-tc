@@ -67,7 +67,7 @@ VALID_HOOK = {
     "task": {
         "created": {"$fromNow": "0 seconds"},
         "deadline": {"$fromNow": "1 hour"},
-        "expires": {"$fromNow": "1 month"},
+        "expires": {"$fromNow": "1 week"},
         "extra": {},
         "metadata": {
             "description": "*DO NOT EDIT* - This resource is "
