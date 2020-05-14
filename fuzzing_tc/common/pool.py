@@ -87,7 +87,7 @@ class MachineTypes:
         """
         for name, spec in self._data[provider][architecture].items():
             if (
-                spec["cpu"] >= min_cpu
+                spec["cpu"] == min_cpu
                 and (spec["ram"] / spec["cpu"]) >= min_ram_per_cpu
             ):
                 if not metal or (metal and spec.get("metal", False)):
@@ -246,6 +246,7 @@ class PoolConfiguration:
         Returns:
             generator of machine (name, capacity): instance type name and task capacity
         """
+        yielded = False
         for machine in machine_types.filter(
             self.cloud,
             self.cpu,
@@ -255,6 +256,8 @@ class PoolConfiguration:
         ):
             cpus = machine_types.cpus(self.cloud, self.cpu, machine)
             yield (machine, cpus // self.cores_per_task)
+            yielded = True
+        assert yielded, "No available machines match specified configuration"
 
     def cycle_crons(self, start=None):
         """Generate cron patterns that correspond to cycle_time (starting from now)

@@ -31,13 +31,13 @@ def test_parse_size(size, divisor, result):
 @pytest.mark.parametrize(
     "provider, cpu, cores, ram, metal, result",
     [
-        ("gcp", "x64", 1, 1, False, ["base", "2-cpus", "more-ram", "metal"]),
+        ("gcp", "x64", 1, 1, False, ["base", "metal"]),
         ("gcp", "x64", 2, 1, False, ["2-cpus", "more-ram"]),
         ("gcp", "x64", 2, 5, False, ["more-ram"]),
         ("gcp", "x64", 1, 1, True, ["metal"]),
-        ("aws", "arm64", 1, 1, False, ["a1", "a2", "a3"]),
-        ("aws", "arm64", 2, 1, False, ["a2", "a3"]),
-        ("aws", "arm64", 12, 32, False, ["a3"]),
+        ("aws", "arm64", 1, 1, False, ["a1"]),
+        ("aws", "arm64", 2, 1, False, ["a2"]),
+        ("aws", "arm64", 12, 32, False, []),
         ("aws", "arm64", 1, 1, True, []),
         # x64 is not present in aws
         ("aws", "x64", 1, 1, False, KeyError),
@@ -136,7 +136,7 @@ def test_aws_resources(env, mock_clouds, mock_machines):
             "scopes": [],
             "disk_size": "120g",
             "cycle_time": "12h",
-            "cores_per_task": 10,
+            "cores_per_task": 2,
             "metal": False,
             "name": "Amazing fuzzing pool",
             "tasks": 3,
@@ -160,11 +160,11 @@ def test_aws_resources(env, mock_clouds, mock_machines):
         "config": {
             "launchConfigs": [
                 {
-                    "capacityPerInstance": 2,
+                    "capacityPerInstance": 1,
                     "launchConfig": {
                         "ImageId": "ami-1234",
                         "InstanceMarketOptions": {"MarketType": "spot"},
-                        "InstanceType": "a3",
+                        "InstanceType": "a2",
                         "Placement": {"AvailabilityZone": "us-west-1a"},
                         "SecurityGroupIds": ["sg-A"],
                         "SubnetId": "subnet-XXX",
