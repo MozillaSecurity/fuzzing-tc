@@ -74,10 +74,12 @@ class Workflow:
             ssh_path = pathlib.Path("~/.ssh").expanduser()
             ssh_path.mkdir(mode=0o700, exist_ok=True)
             path = ssh_path / "id_rsa"
-            assert not path.exists(), f"Existing ssh key found at {path}"
-            path.write_text(private_key)
-            path.chmod(0o400)
-            logger.info("Installed ssh private key")
+            if path.exists():
+                logger.warning(f"Not overwriting pre-existing ssh key at {path}")
+            else:
+                path.write_text(private_key)
+                path.chmod(0o400)
+                logger.info("Installed ssh private key")
 
     def git_clone(self, url=None, path=None, revision=None, **kwargs):
         """Clone a configuration repository"""
