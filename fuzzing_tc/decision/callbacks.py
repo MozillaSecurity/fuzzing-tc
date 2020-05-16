@@ -40,8 +40,8 @@ async def cancel_pool_tasks(action, resource):
             continue
 
         # Cancel the task
-        logger.info(f"Cancelling task {task_id}")
-        queue.cancel(task_id)
+        logger.warning(f"Cannot cancel running task {task_id}")
+        # queue.cancelTask(task_id)
 
 
 async def trigger_hook(action, resource):
