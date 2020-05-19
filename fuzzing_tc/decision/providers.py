@@ -83,10 +83,10 @@ class AWS(object):
                 },
                 "workerConfig": worker_config,
             }
-            for instance, capacity in machines
+            for instance, capacity, az_blacklist in machines
             for region_name, region in self.regions.items()
             for az, subnet in region["subnets"].items()
-            if region_name in amis
+            if region_name in amis and az not in az_blacklist
         ]
 
 
@@ -139,7 +139,8 @@ class GCP(object):
                     "shutdown": {"enabled": True, "afterIdleSeconds": 900}
                 },
             }
-            for instance, capacity in machines
+            for instance, capacity, zone_blacklist in machines
             for region, zones in self.regions.items()
             for zone in zones
+            if zone not in zone_blacklist
         ]

@@ -55,7 +55,7 @@ class MachineTypes:
                 assert arch in ARCHITECTURES, f"unknown architecture: {provider}.{arch}"
                 for machine, spec in machines.items():
                     missing = list({"cpu", "ram"} - set(spec))
-                    extra = list(set(spec) - {"cpu", "ram", "metal"})
+                    extra = list(set(spec) - {"cpu", "ram", "metal", "zone_blacklist"})
                     assert (
                         not missing
                     ), f"machine {provider}.{arch}.{machine} missing required keys: {missing!r}"
@@ -71,6 +71,11 @@ class MachineTypes:
 
     def cpus(self, provider, architecture, machine):
         return self._data[provider][architecture][machine]["cpu"]
+
+    def zone_blacklist(self, provider, architecture, machine):
+        return frozenset(
+            self._data[provider][architecture][machine].get("zone_blacklist", [])
+        )
 
     def filter(self, provider, architecture, min_cpu, min_ram_per_cpu, metal=False):
         """Generate machine types which fit the given requirements.
@@ -255,7 +260,8 @@ class PoolConfiguration:
             self.metal,
         ):
             cpus = machine_types.cpus(self.cloud, self.cpu, machine)
-            yield (machine, cpus // self.cores_per_task)
+            zone_blacklist = machine_types.zone_blacklist(self.cloud, self.cpu, machine)
+            yield (machine, cpus // self.cores_per_task, zone_blacklist)
             yielded = True
         assert yielded, "No available machines match specified configuration"
 

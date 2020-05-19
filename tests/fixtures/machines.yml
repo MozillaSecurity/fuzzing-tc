@@ -9,6 +9,8 @@ gcp:
     more-ram:
       cpu: 2
       ram: 16
+      zone_blacklist:
+        - us-west1-b
     metal:
       cpu: 1
       ram: 1
