@@ -9,6 +9,7 @@ import yaml
 from freezegun import freeze_time
 
 from fuzzing_tc.common.pool import PoolConfiguration as CommonPoolConfiguration
+from fuzzing_tc.decision.pool import DOCKER_WORKER_DEVICES
 from fuzzing_tc.decision.pool import PoolConfiguration
 
 
@@ -331,14 +332,36 @@ def test_gcp_resources(env, mock_clouds, mock_machines):
     assert role.to_json() == VALID_ROLE
 
 
-@pytest.mark.parametrize("env", [(None), ({"someKey": "someValue"})])
-def test_tasks(env):
-
+@pytest.mark.parametrize("env", [None, {"someKey": "someValue"}])
+@pytest.mark.parametrize(
+    "scope_caps",
+    [
+        ([], {}),
+        (["docker-worker:capability:privileged"], {"privileged": True}),
+        (
+            ["docker-worker:capability:device:hostSharedMemory"],
+            {"devices": {"hostSharedMemory": True}},
+        ),
+        (
+            ["docker-worker:capability:privileged"]
+            + [
+                f"docker-worker:capability:device:{dev}"
+                for dev in DOCKER_WORKER_DEVICES
+            ],
+            {
+                "privileged": True,
+                "devices": {dev: True for dev in DOCKER_WORKER_DEVICES},
+            },
+        ),
+    ],
+)
+def test_tasks(env, scope_caps):
+    scopes, expected_capabilities = scope_caps
     conf = PoolConfiguration(
         "test",
         {
             "cloud": "gcp",
-            "scopes": [],
+            "scopes": scopes,
             "disk_size": "10g",
             "cycle_time": "1h",
             "cores_per_task": 1,
@@ -394,6 +417,13 @@ def test_tasks(env):
             task, "payload", "artifacts", "project/fuzzing/private/logs", "expires"
         )
         assert log_expires == expires
+        assert set(task["scopes"]) == set(
+            ["secrets:get:project/fuzzing/decision"] + scopes
+        )
+        # scopes are already asserted above
+        # - read the value for comparison instead of deleting the key, so the object is
+        #   printed in full on failure
+        scopes = task["scopes"]
         assert task == {
             "dependencies": ["someTaskId"],
             "extra": {},
@@ -414,7 +444,7 @@ def test_tasks(env):
                     }
                 },
                 "cache": {},
-                "capabilities": {},
+                "capabilities": expected_capabilities,
                 "env": expected_env,
                 "features": {"taskclusterProxy": True},
                 "image": "MozillaSecurity/fuzzer:latest",
@@ -425,7 +455,7 @@ def test_tasks(env):
             "retries": 1,
             "routes": [],
             "schedulerId": "-",
-            "scopes": ["secrets:get:project/fuzzing/decision"],
+            "scopes": scopes,
             "tags": {},
             "taskGroupId": "someTaskId",
             "workerType": "linux-test",
