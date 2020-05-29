@@ -172,6 +172,11 @@ def test_aws_resources(env, mock_clouds, mock_machines):
                     },
                     "region": "us-west-1",
                     "workerConfig": {
+                        "dockerConfig": {
+                            "linkInfo": {
+                                "binds": [{"source": "/dev/shm", "target": "/dev/shm"}]
+                            },
+                        },
                         "genericWorker": {
                             "config": {
                                 "anyKey": "anyValue",
@@ -180,7 +185,7 @@ def test_aws_resources(env, mock_clouds, mock_machines):
                                 "wstAudience": "communitytc",
                                 "wstServerURL": "https://community-websocktunnel.services.mozilla.com",
                             }
-                        }
+                        },
                     },
                 }
             ],
@@ -258,7 +263,12 @@ def test_gcp_resources(env, mock_clouds, mock_machines):
                     "region": "us-west1",
                     "scheduling": {"onHostMaintenance": "terminate"},
                     "workerConfig": {
-                        "shutdown": {"afterIdleSeconds": 900, "enabled": True}
+                        "dockerConfig": {
+                            "linkInfo": {
+                                "binds": [{"source": "/dev/shm", "target": "/dev/shm"}]
+                            }
+                        },
+                        "shutdown": {"afterIdleSeconds": 900, "enabled": True},
                     },
                     "zone": "us-west1-a",
                 },
@@ -282,7 +292,12 @@ def test_gcp_resources(env, mock_clouds, mock_machines):
                     "region": "us-west1",
                     "scheduling": {"onHostMaintenance": "terminate"},
                     "workerConfig": {
-                        "shutdown": {"afterIdleSeconds": 900, "enabled": True}
+                        "dockerConfig": {
+                            "linkInfo": {
+                                "binds": [{"source": "/dev/shm", "target": "/dev/shm"}]
+                            }
+                        },
+                        "shutdown": {"afterIdleSeconds": 900, "enabled": True},
                     },
                     "zone": "us-west1-b",
                 },
@@ -306,7 +321,12 @@ def test_gcp_resources(env, mock_clouds, mock_machines):
                     "region": "us-west1",
                     "scheduling": {"onHostMaintenance": "terminate"},
                     "workerConfig": {
-                        "shutdown": {"afterIdleSeconds": 900, "enabled": True}
+                        "dockerConfig": {
+                            "linkInfo": {
+                                "binds": [{"source": "/dev/shm", "target": "/dev/shm"}]
+                            }
+                        },
+                        "shutdown": {"afterIdleSeconds": 900, "enabled": True},
                     },
                     "zone": "us-west1-a",
                 },
@@ -338,10 +358,6 @@ def test_gcp_resources(env, mock_clouds, mock_machines):
     [
         ([], {}),
         (["docker-worker:capability:privileged"], {"privileged": True}),
-        (
-            ["docker-worker:capability:device:hostSharedMemory"],
-            {"devices": {"hostSharedMemory": True}},
-        ),
         (
             ["docker-worker:capability:privileged"]
             + [
