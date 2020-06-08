@@ -9,15 +9,48 @@ import yaml
 logger = logging.getLogger()
 
 
-class AWS(object):
+class Provider(object):
+    def __init__(self, base_dir):
+        self.imagesets = yaml.safe_load(
+            (base_dir / "config" / "imagesets.yml").read_text()
+        )
+
+    def get_worker_config(self, worker):
+        assert worker in self.imagesets, f"Missing worker {worker}"
+        out = self.imagesets[worker].get("workerConfig", {})
+        out.setdefault("dockerConfig", {})
+        out.setdefault("genericWorker", {})
+        out["genericWorker"].setdefault("config", {})
+
+        out.update({"shutdown": {"enabled": True, "afterIdleSeconds": 1}})
+        out["dockerConfig"].update(
+            {"allowPrivileged": True, "allowDisableSeccomp": True}
+        )
+
+        # Fixed config for websocket tunnel
+        out["genericWorker"]["config"].update(
+            {
+                "wstAudience": "communitytc",
+                "wstServerURL": "https://community-websocktunnel.services.mozilla.com",
+            }
+        )
+
+        # Add a deploymentId by hashing the config
+        payload = json.dumps(out, sort_keys=True).encode("utf-8")
+        out["genericWorker"]["config"]["deploymentId"] = hashlib.sha256(
+            payload
+        ).hexdigest()[:16]
+
+        return out
+
+
+class AWS(Provider):
     """Amazon Cloud provider config for Taskcluster"""
 
     def __init__(self, base_dir):
         # Load configuration from cloned community config
+        super().__init__(base_dir)
         self.regions = self.load_regions(base_dir / "config" / "aws.yml")
-        self.imagesets = yaml.safe_load(
-            (base_dir / "config" / "imagesets.yml").read_text()
-        )
         logger.info("Loaded AWS configuration")
 
     def load_regions(self, path):
@@ -39,26 +72,6 @@ class AWS(object):
     def get_amis(self, worker):
         assert worker in self.imagesets, f"Missing worker {worker}"
         return self.imagesets[worker]["aws"]["amis"]
-
-    def get_worker_config(self, worker):
-        assert worker in self.imagesets, f"Missing worker {worker}"
-        out = self.imagesets[worker]["workerConfig"]
-
-        # Fixed config for websocket tunnel
-        out["genericWorker"]["config"].update(
-            {
-                "wstAudience": "communitytc",
-                "wstServerURL": "https://community-websocktunnel.services.mozilla.com",
-            }
-        )
-
-        # Add a deploymentId by hashing the config
-        payload = json.dumps(out, sort_keys=True).encode("utf-8")
-        out["genericWorker"]["config"]["deploymentId"] = hashlib.sha256(
-            payload
-        ).hexdigest()[:16]
-
-        return out
 
     def build_launch_configs(self, imageset, machines, disk_size):
         # Load the AWS infos for that imageset
@@ -90,21 +103,18 @@ class AWS(object):
         ]
 
 
-class GCP(object):
+class GCP(Provider):
     """Google Cloud provider config for Taskcluster"""
 
     def __init__(self, base_dir):
         # Load configuration from cloned community config
+        super().__init__(base_dir)
         gcp_config = yaml.safe_load((base_dir / "config" / "gcp.yml").read_text())
         assert "regions" in gcp_config, "Missing regions in gcp config"
         self.regions = {
             region: [f"{region}-{zone}" for zone in details["zones"]]
             for region, details in gcp_config["regions"].items()
         }
-
-        self.imagesets = yaml.safe_load(
-            (base_dir / "config" / "imagesets.yml").read_text()
-        )
         logger.info("Loaded GCP configuration")
 
     def build_launch_configs(self, imageset, machines, disk_size):
@@ -115,6 +125,7 @@ class GCP(object):
             "gcp" in self.imagesets[imageset]
         ), f"No GCP implementation for imageset {imageset}"
         source_image = self.imagesets[imageset]["gcp"]["image"]
+        worker_config = self.get_worker_config(imageset)
 
         return [
             {
@@ -135,9 +146,7 @@ class GCP(object):
                     }
                 ],
                 "networkInterfaces": [{"accessConfigs": [{"type": "ONE_TO_ONE_NAT"}]}],
-                "workerConfig": {
-                    "shutdown": {"enabled": True, "afterIdleSeconds": 900}
-                },
+                "workerConfig": worker_config,
             }
             for instance, capacity, zone_blacklist in machines
             for region, zones in self.regions.items()
