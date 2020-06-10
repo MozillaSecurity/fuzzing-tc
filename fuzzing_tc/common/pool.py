@@ -5,11 +5,14 @@
 # obtain one at http://mozilla.org/MPL/2.0/.
 
 import datetime
+import logging
 import pathlib
 import re
 import types
 
 import yaml
+
+LOG = logging.getLogger("fuzzing_tc.common.pool")
 
 # fields that must exist in pool.yml, and their types
 FIELD_TYPES = types.MappingProxyType(
@@ -123,6 +126,7 @@ class PoolConfiguration:
     """
 
     def __init__(self, pool_id, data, base_dir=None, _flattened=None):
+        LOG.debug(f"creating pool {pool_id}")
         missing = list(set(data) - set(FIELD_TYPES))
         extra = list(set(FIELD_TYPES) - set(data))
         assert not missing, f"configuration is missing fields: {missing!r}"
@@ -159,7 +163,11 @@ class PoolConfiguration:
         self.macros = data["macros"].copy()
 
         # list fields
-        self.command = data["command"].copy()
+        # command is an overwriting field, null is allowed
+        if data["command"] is not None:
+            self.command = data["command"].copy()
+        else:
+            self.command = None
         self.parents = data["parents"].copy()
         self.scopes = data["scopes"].copy()
 
@@ -201,6 +209,31 @@ class PoolConfiguration:
         assert not missing, f"Pool is missing fields: {list(missing)!r}"
 
     def _flatten(self, flattened):
+        overwriting_fields = (
+            "cloud",
+            "command",
+            "container",
+            "cores_per_task",
+            "cpu",
+            "cycle_time",
+            "disk_size",
+            "imageset",
+            "metal",
+            "minimum_memory_per_core",
+            "name",
+            "platform",
+            "tasks",
+        )
+        merge_dict_fields = ("macros",)
+        merge_list_fields = ("scopes",)
+        null_fields = {
+            field for field in overwriting_fields if getattr(self, field) is None
+        }
+        # need to update dict values defined in self at the very end
+        my_merge_dict_values = {
+            field: getattr(self, field).copy() for field in merge_dict_fields
+        }
+
         for parent_id in self.parents:
             assert (
                 parent_id not in flattened
@@ -209,39 +242,37 @@ class PoolConfiguration:
             parent_obj = self.from_file(self.base_dir / f"{parent_id}.yml", flattened)
 
             # "normal" overwriting fields
-            for field in (
-                "cloud",
-                "container",
-                "cores_per_task",
-                "cpu",
-                "cycle_time",
-                "disk_size",
-                "imageset",
-                "metal",
-                "minimum_memory_per_core",
-                "name",
-                "platform",
-                "tasks",
-            ):
-                if getattr(self, field) is None:
+            for field in overwriting_fields:
+                if field in null_fields:
+                    if getattr(parent_obj, field) is not None:
+                        LOG.debug(
+                            f"overwriting field {field} in {self.pool_id} from {parent_id}"
+                        )
                     setattr(self, field, getattr(parent_obj, field))
 
             # merged dict fields
-            for field in ("macros",):
+            for field in merge_dict_fields:
+                if getattr(parent_obj, field):
+                    LOG.debug(
+                        f"merging dict field {field} in {self.pool_id} from {parent_id}"
+                    )
                 getattr(self, field).update(getattr(parent_obj, field))
 
             # merged list fields
-            for field in ("scopes",):
+            for field in merge_list_fields:
+                if getattr(parent_obj, field):
+                    LOG.debug(
+                        f"merging list field {field} in {self.pool_id} from {parent_id}"
+                    )
                 setattr(
                     self,
                     field,
                     list(set(getattr(self, field)) | set(getattr(parent_obj, field))),
                 )
 
-            # overwriting list fields
-            for field in ("command",):
-                if not getattr(self, field):
-                    setattr(self, field, getattr(parent_obj, field).copy())
+        # dict values defined in self take precedence over values defined in parents
+        for field, values in my_merge_dict_values.items():
+            getattr(self, field).update(values)
 
     def get_machine_list(self, machine_types):
         """

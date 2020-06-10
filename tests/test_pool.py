@@ -2,15 +2,17 @@
 
 import copy
 from datetime import datetime
+from pathlib import Path
 
 import pytest
 import slugid
-import yaml
 from freezegun import freeze_time
 
 from fuzzing_tc.common.pool import PoolConfiguration as CommonPoolConfiguration
 from fuzzing_tc.decision.pool import DOCKER_WORKER_DEVICES
 from fuzzing_tc.decision.pool import PoolConfiguration
+
+POOL_FIXTURES = Path(__file__).parent / "fixtures" / "pools"
 
 
 @pytest.mark.parametrize(
@@ -496,67 +498,30 @@ def test_tasks(env, scope_caps):
         }
 
 
-def test_flatten(tmp_path):
-    pool_data1 = {
-        "cloud": "aws",
-        "scopes": ["scope1"],
-        "disk_size": "120g",
-        "cycle_time": "1h",
-        "cores_per_task": 10,
-        "metal": False,
-        "name": "parent",
-        "tasks": 3,
-        "command": ["cmd1", "arg1"],
-        "container": "MozillaSecurity/fuzzer:latest",
-        "minimum_memory_per_core": "1g",
-        "imageset": "generic-worker-A",
-        "parents": [],
-        "cpu": "arm64",
-        "platform": "linux",
-        "macros": {"ENVVAR1": "123456", "ENVVAR2": "789abc"},
-    }
-    pool_data2 = {
-        "cloud": None,
-        "scopes": ["scope2"],
-        "disk_size": None,
-        "cycle_time": "2h",
-        "cores_per_task": None,
-        "metal": None,
-        "name": "child",
-        "tasks": None,
-        "command": ["cmd2", "arg2"],
-        "container": None,
-        "minimum_memory_per_core": None,
-        "imageset": None,
-        "parents": ["pool1"],
-        "cpu": None,
-        "platform": None,
-        "macros": {"ENVVAR3": "defghi"},
-    }
-    (tmp_path / "pool1.yml").write_text(yaml.dump(pool_data1))
-    (tmp_path / "pool2.yml").write_text(yaml.dump(pool_data2))
+@pytest.mark.parametrize("pool_num", range(1, 7))
+def test_flatten(pool_num):
+    class PoolConfigNoFlatten(CommonPoolConfiguration):
+        def _flatten(self, _):
+            pass
 
-    pool = CommonPoolConfiguration.from_file(tmp_path / "pool2.yml")
-    assert pool.cloud == "aws"
-    assert set(pool.scopes) == {"scope1", "scope2"}
-    assert pool.disk_size == 120
-    assert pool.cycle_time == 7200
-    assert pool.cores_per_task == 10
-    assert pool.metal is False
-    assert pool.name == "child"
-    assert pool.tasks == 3
-    assert pool.command == ["cmd2", "arg2"]
-    assert pool.container == "MozillaSecurity/fuzzer:latest"
-    assert pool.minimum_memory_per_core == 1.0
-    assert pool.imageset == "generic-worker-A"
-    assert pool.parents == ["pool1"]
-    assert pool.cpu == "arm64"
-    assert pool.platform == "linux"
-    assert pool.macros == {
-        "ENVVAR1": "123456",
-        "ENVVAR2": "789abc",
-        "ENVVAR3": "defghi",
-    }
+    pool = CommonPoolConfiguration.from_file(POOL_FIXTURES / f"pool{pool_num}.yml")
+    expect = PoolConfigNoFlatten.from_file(POOL_FIXTURES / f"expect{pool_num}.yml")
+    assert pool.cloud == expect.cloud
+    assert set(pool.scopes) == set(expect.scopes)
+    assert pool.disk_size == expect.disk_size
+    assert pool.cycle_time == expect.cycle_time
+    assert pool.cores_per_task == expect.cores_per_task
+    assert pool.metal == expect.metal
+    assert pool.name == expect.name
+    assert pool.tasks == expect.tasks
+    assert pool.command == expect.command
+    assert pool.container == expect.container
+    assert pool.minimum_memory_per_core == expect.minimum_memory_per_core
+    assert pool.imageset == expect.imageset
+    assert pool.parents == expect.parents
+    assert pool.cpu == expect.cpu
+    assert pool.platform == expect.platform
+    assert pool.macros == expect.macros
 
 
 def test_cycle_crons():
