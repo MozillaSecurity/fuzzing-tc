@@ -121,6 +121,8 @@ community_config:
 # Use a local fuzzing configuration
 fuzzing_config:
   path: /path/to/mozilla/private-fuzzing-config
+  url: git@github.com:mozilla/private-fuzzing-config.git
+  revision: refs/heads/master
 ```
 
 To use that file, specify the following arguments:

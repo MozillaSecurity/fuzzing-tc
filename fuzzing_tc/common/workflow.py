@@ -83,12 +83,14 @@ class Workflow:
 
     def git_clone(self, url=None, path=None, revision=None, **kwargs):
         """Clone a configuration repository"""
+        local_path = False
+
         if path is not None:
             path = pathlib.Path(path)
             # Use local path when available
             assert path.is_dir(), f"Invalid repo dir {path}"
             logger.info(f"Using local configuration in {path}")
-
+            local_path = True
         elif url is not None:
             # Clone from remote repository
             path = pathlib.Path(tempfile.mkdtemp(suffix=url[url.rindex("/") + 1 :]))
@@ -103,7 +105,7 @@ class Workflow:
 
         # Update to specified revision
         # Fallback to pulling remote references
-        if revision is not None:
+        if not local_path and revision is not None:
             logger.info(f"Updating repo to {revision}")
             try:
                 cmd = ["git", "checkout", revision, "-q"]
