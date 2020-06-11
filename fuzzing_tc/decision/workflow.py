@@ -114,7 +114,7 @@ class Workflow(CommonWorkflow):
         assert "fuzzing" in community, "Missing fuzzing main key in community config"
 
         def _suffix(data, key):
-            existing = data.get(key, {}).keys()
+            existing = data.get(key, {})
             if not existing:
                 # Manage every resource possible
                 return ".*"
@@ -129,12 +129,20 @@ class Workflow(CommonWorkflow):
 
         hook_suffix = _suffix(community["fuzzing"], "hooks")
         pool_suffix = _suffix(community["fuzzing"], "workerPools")
+        grant_roles = {
+            "grants": {
+                role
+                for grant in community["fuzzing"].get("grants", [])
+                for role in grant.get("to", [])
+                if role.startswith(f"hook-id:{HOOK_PREFIX}/") and "*" not in role
+            }
+        }
+        role_suffix = _suffix(grant_roles, "grants")
 
         return [
             rf"Hook={HOOK_PREFIX}/{hook_suffix}",
             rf"WorkerPool={WORKER_POOL_PREFIX}/{pool_suffix}",
-            # We only manage all the hooks roles
-            rf"Role=hook-id:{HOOK_PREFIX}/.*",
+            rf"Role=hook-id:{HOOK_PREFIX}/{role_suffix}",
         ]
 
     def build_tasks(self, pool_name, task_id, config):
