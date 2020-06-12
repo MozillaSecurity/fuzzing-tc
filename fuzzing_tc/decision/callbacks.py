@@ -24,7 +24,7 @@ async def cancel_pool_tasks(action, resource):
     logger.info(f"Cancelling tasks for {provisioner} / {worker_type}")
     workers = queue.listWorkers(provisioner, worker_type)
     for worker in workers["workers"]:
-        latest_task = worker["latestTask"]
+        latest_task = worker.get("latestTask")
         if not latest_task:
             continue
 
