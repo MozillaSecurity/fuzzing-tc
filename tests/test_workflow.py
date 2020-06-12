@@ -19,7 +19,16 @@ def test_patterns(tmp_path):
     # Write community fuzzing config
     conf = tmp_path / "config" / "projects" / "fuzzing.yml"
     conf.parent.mkdir(parents=True)
-    conf.write_text(yaml.dump({"fuzzing": {"workerPools": {"pool-A": {}, "ci": {}}}}))
+    conf.write_text(
+        yaml.dump(
+            {
+                "fuzzing": {
+                    "workerPools": {"pool-A": {}, "ci": {}},
+                    "grants": [{"grant": [], "to": ["hook-id:project-fuzzing/B"]}],
+                }
+            }
+        )
+    )
 
     # Build resources patterns using that configuration
     workflow = Workflow()
@@ -28,7 +37,7 @@ def test_patterns(tmp_path):
     assert patterns == [
         "Hook=project-fuzzing/.*",
         "WorkerPool=proj-fuzzing/(?!(ci|pool-A)$)",
-        "Role=hook-id:project-fuzzing/.*",
+        "Role=hook-id:project-fuzzing/(?!(B)$)",
     ]
 
     def _match(test):

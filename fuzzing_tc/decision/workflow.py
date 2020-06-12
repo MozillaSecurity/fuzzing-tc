@@ -131,7 +131,7 @@ class Workflow(CommonWorkflow):
         pool_suffix = _suffix(community["fuzzing"], "workerPools")
         grant_roles = {
             "grants": {
-                role
+                role.split(f"{HOOK_PREFIX}/", 1)[1]
                 for grant in community["fuzzing"].get("grants", [])
                 for role in grant.get("to", [])
                 if role.startswith(f"hook-id:{HOOK_PREFIX}/") and "*" not in role
