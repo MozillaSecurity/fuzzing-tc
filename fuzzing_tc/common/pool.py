@@ -310,7 +310,9 @@ class PoolConfiguration:
             assert isinstance(start, (float, int))
             now = datetime.datetime.fromtimestamp(start, datetime.timezone.utc)
         else:
-            now = datetime.datetime.now(datetime.timezone.utc)
+            now = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(
+                seconds=1
+            )
         interval = datetime.timedelta(seconds=self.cycle_time)
 
         # special case if the cycle time is a factor of 24 hours

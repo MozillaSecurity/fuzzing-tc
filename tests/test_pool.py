@@ -66,7 +66,7 @@ VALID_HOOK = {
     "hookId": "linux-test",
     "name": "linux-test",
     "owner": "fuzzing+taskcluster@mozilla.com",
-    "schedule": ["0 0 12 * * *", "0 0 0 * * *"],
+    "schedule": ["59 59 11 * * *", "59 59 23 * * *"],
     "task": {
         "created": {"$fromNow": "0 seconds"},
         "deadline": {"$fromNow": "1 hour"},
