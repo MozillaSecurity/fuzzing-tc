@@ -22,7 +22,7 @@ class Provider(object):
         out.setdefault("genericWorker", {})
         out["genericWorker"].setdefault("config", {})
 
-        out.update({"shutdown": {"enabled": True, "afterIdleSeconds": 1}})
+        out.update({"shutdown": {"enabled": True, "afterIdleSeconds": 15}})
         out["dockerConfig"].update(
             {"allowPrivileged": True, "allowDisableSeccomp": True}
         )

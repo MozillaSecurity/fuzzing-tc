@@ -181,13 +181,13 @@ def test_aws_resources(env, mock_clouds, mock_machines):
                         "genericWorker": {
                             "config": {
                                 "anyKey": "anyValue",
-                                "deploymentId": "9e37fbdaa55dbb5d",
+                                "deploymentId": "d9465de45bdee4be",
                                 "os": "linux",
                                 "wstAudience": "communitytc",
                                 "wstServerURL": "https://community-websocktunnel.services.mozilla.com",
                             },
                         },
-                        "shutdown": {"afterIdleSeconds": 1, "enabled": True},
+                        "shutdown": {"afterIdleSeconds": 15, "enabled": True},
                     },
                 }
             ],
@@ -271,12 +271,12 @@ def test_gcp_resources(env, mock_clouds, mock_machines):
                         },
                         "genericWorker": {
                             "config": {
-                                "deploymentId": "39028f42dc387ad8",
+                                "deploymentId": "ff173b0660475975",
                                 "wstAudience": "communitytc",
                                 "wstServerURL": "https://community-websocktunnel.services.mozilla.com",
                             },
                         },
-                        "shutdown": {"afterIdleSeconds": 1, "enabled": True},
+                        "shutdown": {"afterIdleSeconds": 15, "enabled": True},
                     },
                     "zone": "us-west1-a",
                 },
@@ -306,12 +306,12 @@ def test_gcp_resources(env, mock_clouds, mock_machines):
                         },
                         "genericWorker": {
                             "config": {
-                                "deploymentId": "39028f42dc387ad8",
+                                "deploymentId": "ff173b0660475975",
                                 "wstAudience": "communitytc",
                                 "wstServerURL": "https://community-websocktunnel.services.mozilla.com",
                             },
                         },
-                        "shutdown": {"afterIdleSeconds": 1, "enabled": True},
+                        "shutdown": {"afterIdleSeconds": 15, "enabled": True},
                     },
                     "zone": "us-west1-b",
                 },
@@ -341,12 +341,12 @@ def test_gcp_resources(env, mock_clouds, mock_machines):
                         },
                         "genericWorker": {
                             "config": {
-                                "deploymentId": "39028f42dc387ad8",
+                                "deploymentId": "ff173b0660475975",
                                 "wstAudience": "communitytc",
                                 "wstServerURL": "https://community-websocktunnel.services.mozilla.com",
                             },
                         },
-                        "shutdown": {"afterIdleSeconds": 1, "enabled": True},
+                        "shutdown": {"afterIdleSeconds": 15, "enabled": True},
                     },
                     "zone": "us-west1-a",
                 },
