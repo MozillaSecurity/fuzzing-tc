@@ -213,6 +213,7 @@ class PoolConfiguration(CommonPoolConfiguration):
                     "env": {
                         "TASKCLUSTER_FUZZING_POOL": self.pool_id,
                         "TASKCLUSTER_SECRET": DECISION_TASK_SECRET,
+                        "TASKCLUSTER_FUZZING_PREPROCESS": "1",
                     },
                     "features": {"taskclusterProxy": True},
                     "image": preprocess.container,

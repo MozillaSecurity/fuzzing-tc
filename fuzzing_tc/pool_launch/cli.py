@@ -21,6 +21,12 @@ def main(args=None):
         help="The target fuzzing pool to create tasks for",
         default=os.environ.get("TASKCLUSTER_FUZZING_POOL"),
     )
+    parser.add_argument(
+        "--preprocess",
+        action="store_true",
+        help="Load the pre-process config instead of the normal pool config",
+        default=os.environ.get("TASKCLUSTER_FUZZING_PREPROCESS") == "1",
+    )
     parser.add_argument("command", help="docker command-line", nargs=argparse.REMAINDER)
     args = parser.parse_args(args=args)
 
@@ -28,7 +34,7 @@ def main(args=None):
     logging.basicConfig(level=logging.INFO)
 
     # Configure workflow using the secret or local configuration
-    launcher = PoolLauncher(args.command, args.pool_name)
+    launcher = PoolLauncher(args.command, args.pool_name, args.preprocess)
     config = launcher.configure(
         local_path=args.configuration,
         secret=args.taskcluster_secret,

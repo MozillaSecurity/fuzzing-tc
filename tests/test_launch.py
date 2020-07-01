@@ -90,6 +90,39 @@ def test_load_params(tmp_path):
     with pytest.raises(AssertionError):
         launcher.load_params()
 
+    # test 4: preprocess task is loaded
+    preproc_data = {
+        "cloud": None,
+        "scopes": [],
+        "disk_size": None,
+        "cycle_time": None,
+        "cores_per_task": None,
+        "metal": None,
+        "name": "preproc",
+        "tasks": 1,
+        "command": None,
+        "container": None,
+        "minimum_memory_per_core": None,
+        "imageset": None,
+        "parents": [],
+        "cpu": None,
+        "platform": None,
+        "preprocess": None,
+        "macros": {"PREPROC": "1"},
+    }
+    pool_data["preprocess"] = "preproc"
+    with (tmp_path / "test-pool.yml").open("w") as test_cfg:
+        yaml.dump(pool_data, stream=test_cfg)
+    with (tmp_path / "preproc.yml").open("w") as test_cfg:
+        yaml.dump(preproc_data, stream=test_cfg)
+
+    launcher = PoolLauncher([], "test-pool", True)
+    launcher.fuzzing_config_dir = tmp_path
+
+    launcher.load_params()
+    assert launcher.command == ["new-command", "arg1", "arg2"]
+    assert launcher.environment == {"STATIC": "value", "PREPROC": "1"}
+
 
 def test_launch_exec(tmp_path, monkeypatch):
     # Start with taskcluster detection disabled, even on CI

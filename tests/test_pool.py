@@ -527,8 +527,12 @@ def test_preprocess_tasks():
         return date
 
     expected = [
-        {"name": "preprocess", "deps": ["someTaskId"]},
-        {"name": "1/1", "deps": ["someTaskId", task_ids[0]]},
+        {
+            "name": "preprocess",
+            "deps": ["someTaskId"],
+            "extra_env": {"TASKCLUSTER_FUZZING_PREPROCESS": "1"},
+        },
+        {"name": "1/1", "deps": ["someTaskId", task_ids[0]], "extra_env": {}},
     ]
     for task, expect in zip(tasks, expected):
         created = _check_date(task, "created")
@@ -539,6 +543,7 @@ def test_preprocess_tasks():
             "TASKCLUSTER_FUZZING_POOL": "pre-pool",
             "TASKCLUSTER_SECRET": "project/fuzzing/decision",
         }
+        expected_env.update(expect["extra_env"])
 
         log_expires = _check_date(
             task, "payload", "artifacts", "project/fuzzing/private/logs", "expires"

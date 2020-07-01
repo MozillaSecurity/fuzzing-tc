@@ -20,12 +20,13 @@ class PoolLauncher(Workflow):
     """Launcher for a fuzzing pool, using docker parameters from a private repo.
     """
 
-    def __init__(self, command, pool_name):
+    def __init__(self, command, pool_name, preprocess=False):
         super().__init__()
 
         self.command = command.copy()
         self.environment = os.environ.copy()
         self.pool_name = pool_name
+        self.preprocess = preprocess
         self.log_dir = pathlib.Path("/logs")
 
     def clone(self, config):
@@ -41,6 +42,9 @@ class PoolLauncher(Workflow):
 
         # Build tasks needed for a specific pool
         pool_config = PoolConfiguration.from_file(path)
+        if self.preprocess:
+            pool_config = pool_config.create_preprocess()
+            assert pool_config is not None, "preprocess given, but could not be loaded"
         pool_config.assert_complete()
 
         if pool_config.command:
