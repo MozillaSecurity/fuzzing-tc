@@ -1,0 +1,18 @@
+cloud: null
+scopes: []
+disk_size: null
+cycle_time: null
+cores_per_task: null
+metal: null
+name: pre
+tasks: 1
+command: []
+container: null
+minimum_memory_per_core: null
+imageset: null
+parents: []
+cpu: null
+platform: null
+preprocess: null
+macros:
+  PREPROCESS: "1"
