@@ -182,11 +182,64 @@ class PoolConfiguration(CommonPoolConfiguration):
     def build_tasks(self, parent_task_id, env=None):
         """Create fuzzing tasks and attach them to a decision task"""
         now = datetime.utcnow()
-        for i in range(1, self.tasks + 1):
+        deps = [parent_task_id]
+
+        preprocess = self.create_preprocess()
+        if preprocess is not None:
             task_id = slugId()
             task = {
                 "taskGroupId": parent_task_id,
                 "dependencies": [parent_task_id],
+                "created": stringDate(now),
+                "deadline": stringDate(now + timedelta(seconds=preprocess.cycle_time)),
+                "expires": stringDate(fromNow("1 week", now)),
+                "extra": {},
+                "metadata": {
+                    "description": DESCRIPTION,
+                    "name": f"Fuzzing task {self.task_id} - preprocess",
+                    "owner": OWNER_EMAIL,
+                    "source": "https://github.com/MozillaSecurity/fuzzing-tc",
+                },
+                "payload": {
+                    "artifacts": {
+                        "project/fuzzing/private/logs": {
+                            "expires": stringDate(fromNow("1 week", now)),
+                            "path": "/logs/",
+                            "type": "directory",
+                        }
+                    },
+                    "cache": {},
+                    "capabilities": {},
+                    "env": {
+                        "TASKCLUSTER_FUZZING_POOL": self.pool_id,
+                        "TASKCLUSTER_SECRET": DECISION_TASK_SECRET,
+                    },
+                    "features": {"taskclusterProxy": True},
+                    "image": preprocess.container,
+                    "maxRunTime": preprocess.cycle_time,
+                },
+                "priority": "high",
+                "provisionerId": PROVISIONER_ID,
+                "workerType": self.task_id,
+                "retries": 1,
+                "routes": [],
+                "schedulerId": SCHEDULER_ID,
+                "scopes": preprocess.scopes + [f"secrets:get:{DECISION_TASK_SECRET}"],
+                "tags": {},
+            }
+            add_capabilities_for_scopes(task)
+            if env is not None:
+                assert set(task["payload"]["env"]).isdisjoint(set(env))
+                task["payload"]["env"].update(env)
+            deps.append(task_id)
+
+            yield task_id, task
+
+        for i in range(1, self.tasks + 1):
+            task_id = slugId()
+            task = {
+                "taskGroupId": parent_task_id,
+                "dependencies": deps,
                 "created": stringDate(now),
                 "deadline": stringDate(now + timedelta(seconds=self.cycle_time)),
                 "expires": stringDate(fromNow("1 week", now)),

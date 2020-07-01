@@ -17,5 +17,6 @@ parents:
   - pool1
 cpu: null
 platform: null
+preprocess: null
 macros:
   ENVVAR3: defghi

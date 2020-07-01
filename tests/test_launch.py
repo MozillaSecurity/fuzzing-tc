@@ -53,6 +53,7 @@ def test_load_params(tmp_path):
         "parents": [],
         "cpu": "arm64",
         "platform": "linux",
+        "preprocess": "",
         "macros": {"ENVVAR1": "123456", "ENVVAR2": "789abc"},
     }
 

@@ -15,4 +15,5 @@ parents:
   - pool4
 cpu: null
 platform: null
+preprocess: null
 macros: {}

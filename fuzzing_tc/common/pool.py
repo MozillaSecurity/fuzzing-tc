@@ -31,6 +31,7 @@ FIELD_TYPES = types.MappingProxyType(
         "name": str,
         "parents": list,
         "platform": str,
+        "preprocess": str,
         "scopes": list,
         "tasks": int,
     }
@@ -121,14 +122,15 @@ class PoolConfiguration:
         parents (list): list of parents to inherit from
         platform (str): operating system of the target (linux, windows)
         pool_id (str): basename of the pool on disk (eg. "pool1" for pool1.yml)
+        preprocess (str): name of pool configuration to apply and run before fuzzing tasks
         scopes (list): list of taskcluster scopes required by the target
         tasks (int): number of tasks to run (each with `cores_per_task`)
     """
 
     def __init__(self, pool_id, data, base_dir=None, _flattened=None):
         LOG.debug(f"creating pool {pool_id}")
-        missing = list(set(data) - set(FIELD_TYPES))
-        extra = list(set(FIELD_TYPES) - set(data))
+        extra = list(set(data) - set(FIELD_TYPES))
+        missing = list(set(FIELD_TYPES) - set(data))
         assert not missing, f"configuration is missing fields: {missing!r}"
         assert not extra, f"configuration has extra fields: {extra!r}"
 
@@ -158,6 +160,7 @@ class PoolConfiguration:
         assert self.name is not None, "name is required for every configuration"
         self.platform = data["platform"]
         self.tasks = data["tasks"]
+        self.preprocess = data["preprocess"]
 
         # dict fields
         self.macros = data["macros"].copy()
@@ -208,6 +211,36 @@ class PoolConfiguration:
         missing = {field for field in FIELD_TYPES if getattr(self, field) is None}
         assert not missing, f"Pool is missing fields: {list(missing)!r}"
 
+    def create_preprocess(self):
+        """
+        Return a new PoolConfiguration based on the value of self.preprocess
+        """
+        if not self.preprocess:
+            return None
+        data = yaml.safe_load((self.base_dir / f"{self.preprocess}.yml").read_text())
+        pool_id = self.pool_id + "-preprocess"
+        assert not data["preprocess"], f"{self.preprocess} cannot set preprocess"
+        assert data["tasks"] == 1 or (
+            self.tasks == 1 and data["tasks"] is None
+        ), f"{self.preprocess} must set tasks = 1"
+        cannot_set = [
+            "disk_size",
+            "cores_per_task",
+            "cpu",
+            "cloud",
+            "cycle_time",
+            "imageset",
+            "metal",
+            "minimum_memory_per_core",
+            "platform",
+        ]
+        for field in cannot_set:
+            assert data[field] is None, f"{self.preprocess} cannot set {field}"
+        data["preprocess"] = ""  # blank the preprocess field to avoid inheritance
+        data["parents"] = [self.pool_id] + data["parents"]
+        data["name"] = f"{self.name} ({data['name']})"
+        return type(self)(pool_id, data, self.base_dir)
+
     def _flatten(self, flattened):
         overwriting_fields = (
             "cloud",
@@ -222,6 +255,7 @@ class PoolConfiguration:
             "minimum_memory_per_core",
             "name",
             "platform",
+            "preprocess",
             "tasks",
         )
         merge_dict_fields = ("macros",)

@@ -20,6 +20,7 @@ parents:
   - pool4
 cpu: x64
 platform: windows
+preprocess: null
 macros:
   ENVVAR1: "abc"
   ENVVAR2: 789abc
