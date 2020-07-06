@@ -45,7 +45,6 @@ class PoolLauncher(Workflow):
         if self.preprocess:
             pool_config = pool_config.create_preprocess()
             assert pool_config is not None, "preprocess given, but could not be loaded"
-        pool_config.assert_complete()
 
         if pool_config.command:
             assert not self.command, "Specify command-line args XOR pool.command"

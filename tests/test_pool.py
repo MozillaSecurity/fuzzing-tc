@@ -592,7 +592,7 @@ def test_preprocess_tasks():
         }
 
 
-@pytest.mark.parametrize("pool_num", range(1, 7))
+@pytest.mark.parametrize("pool_num", range(1, 8))
 def test_flatten(pool_num):
     class PoolConfigNoFlatten(CommonPoolConfiguration):
         def _flatten(self, _):
@@ -681,3 +681,9 @@ def test_cycle_crons():
     crons = list(conf.cycle_crons(0))
     assert len(crons) == (365 // 17) + 1
     assert crons[:4] == ["0 0 0 18 1 *", "0 0 0 4 2 *", "0 0 0 21 2 *", "0 0 0 10 3 *"]
+
+
+def test_required():
+    CommonPoolConfiguration("test", {"name": "test pool"}, _flattened={})
+    with pytest.raises(AssertionError):
+        CommonPoolConfiguration("test", {}, _flattened={})

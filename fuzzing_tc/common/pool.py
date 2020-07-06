@@ -14,7 +14,7 @@ import yaml
 
 LOG = logging.getLogger("fuzzing_tc.common.pool")
 
-# fields that must exist in pool.yml, and their types
+# fields that must exist in pool.yml (once flattened), and their types
 FIELD_TYPES = types.MappingProxyType(
     {
         "cloud": str,
@@ -36,14 +36,18 @@ FIELD_TYPES = types.MappingProxyType(
         "tasks": int,
     }
 )
-CPU_ALIASES = {
-    "x86_64": "x64",
-    "amd64": "x64",
-    "x86-64": "x64",
-    "x64": "x64",
-    "arm64": "arm64",
-    "aarch64": "arm64",
-}
+# fields that must exist in every pool.yml
+REQUIRED_FIELDS = frozenset(("name",))
+CPU_ALIASES = types.MappingProxyType(
+    {
+        "x86_64": "x64",
+        "amd64": "x64",
+        "x86-64": "x64",
+        "x64": "x64",
+        "arm64": "arm64",
+        "aarch64": "arm64",
+    }
+)
 PROVIDERS = frozenset(("aws", "gcp"))
 ARCHITECTURES = frozenset(("x64", "arm64"))
 
@@ -130,7 +134,7 @@ class PoolConfiguration:
     def __init__(self, pool_id, data, base_dir=None, _flattened=None):
         LOG.debug(f"creating pool {pool_id}")
         extra = list(set(data) - set(FIELD_TYPES))
-        missing = list(set(FIELD_TYPES) - set(data))
+        missing = list(REQUIRED_FIELDS - set(data))
         assert not missing, f"configuration is missing fields: {missing!r}"
         assert not extra, f"configuration has extra fields: {extra!r}"
 
@@ -140,11 +144,11 @@ class PoolConfiguration:
 
         # check that all fields are of the right type (or None)
         for field, cls in FIELD_TYPES.items():
-            if data[field] is not None:
+            if data.get(field) is not None:
                 assert isinstance(
                     data[field], cls
                 ), f"expected '{field}' to be '{cls.__name__}', got '{type(data[field]).__name__}'"
-        for key, value in data["macros"].items():
+        for key, value in data.get("macros", {}).items():
             assert isinstance(
                 key, str
             ), f"expected macro '{key!r}' name to be 'str', got '{type(key).__name__}'"
@@ -152,64 +156,78 @@ class PoolConfiguration:
                 value, str
             ), f"expected macro '{key}' value to be 'str', got '{type(value).__name__}'"
 
-        self.container = data["container"]
-        self.cores_per_task = data["cores_per_task"]
-        self.imageset = data["imageset"]
-        self.metal = data["metal"]
+        self.container = data.get("container")
+        self.cores_per_task = data.get("cores_per_task")
+        self.imageset = data.get("imageset")
+        self.metal = data.get("metal")
         self.name = data["name"]
         assert self.name is not None, "name is required for every configuration"
-        self.platform = data["platform"]
-        self.tasks = data["tasks"]
-        self.preprocess = data["preprocess"]
+        self.platform = data.get("platform")
+        self.tasks = data.get("tasks")
+        self.preprocess = data.get("preprocess")
 
         # dict fields
-        self.macros = data["macros"].copy()
+        self.macros = data.get("macros", {}).copy()
 
         # list fields
         # command is an overwriting field, null is allowed
-        if data["command"] is not None:
+        if data.get("command") is not None:
             self.command = data["command"].copy()
         else:
             self.command = None
-        self.parents = data["parents"].copy()
-        self.scopes = data["scopes"].copy()
+        self.parents = data.get("parents", []).copy()
+        self.scopes = data.get("scopes", []).copy()
 
         # size fields
         self.minimum_memory_per_core = self.disk_size = None
-        if data["minimum_memory_per_core"] is not None:
+        if data.get("minimum_memory_per_core") is not None:
             self.minimum_memory_per_core = self.parse_size(
                 data["minimum_memory_per_core"], self.parse_size("1g")
             )
-        if data["disk_size"] is not None:
+        if data.get("disk_size") is not None:
             self.disk_size = int(
                 self.parse_size(data["disk_size"], self.parse_size("1g"))
             )
 
         # time fields
         self.cycle_time = None
-        if data["cycle_time"] is not None:
+        if data.get("cycle_time") is not None:
             self.cycle_time = int(self.parse_time(data["cycle_time"]))
 
         # other special fields
-        self.cpu = self.cloud = None
-        if data["cpu"] is not None:
+        self.cpu = None
+        if data.get("cpu") is not None:
             cpu = self.alias_cpu(data["cpu"])
             assert cpu in ARCHITECTURES
             self.cpu = cpu
-
-        if data["cloud"] is not None:
+        self.cloud = None
+        if data.get("cloud") is not None:
             assert data["cloud"] in PROVIDERS, "Invalid cloud - use {}".format(
                 ",".join(PROVIDERS)
             )
-        self.cloud = data["cloud"]
+            self.cloud = data["cloud"]
 
+        top_level = False
         if _flattened is None:
+            top_level = True
             _flattened = {self.pool_id}
         self._flatten(_flattened)
-
-    def assert_complete(self):
-        missing = {field for field in FIELD_TYPES if getattr(self, field) is None}
-        assert not missing, f"Pool is missing fields: {list(missing)!r}"
+        if top_level:
+            # set defaults
+            if self.command is None:
+                self.command = []
+            if self.macros is None:
+                self.macros = {}
+            if self.parents is None:
+                self.parents = []
+            if self.preprocess is None:
+                self.preprocess = ""
+            if self.scopes is None:
+                self.scopes = []
+            # assert complete
+            missing = {field for field in FIELD_TYPES if getattr(self, field) is None}
+            missing.discard("schedule_start")  # this field can be null
+            assert not missing, f"Pool is missing fields: {list(missing)!r}"
 
     def create_preprocess(self):
         """

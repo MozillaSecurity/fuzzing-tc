@@ -16,7 +16,7 @@ imageset: generic-worker-4
 parents: []
 cpu: x64
 platform: windows
-preprocess: null
+preprocess: ""
 macros:
   ENVVAR1: "abc"
   ENVVAR5: "xyz"
