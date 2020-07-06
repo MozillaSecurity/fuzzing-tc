@@ -6,7 +6,6 @@ from pathlib import Path
 
 import pytest
 import slugid
-from freezegun import freeze_time
 
 from fuzzing_tc.common.pool import PoolConfiguration as CommonPoolConfiguration
 from fuzzing_tc.decision.pool import DOCKER_WORKER_DEVICES
@@ -66,7 +65,7 @@ VALID_HOOK = {
     "hookId": "linux-test",
     "name": "linux-test",
     "owner": "fuzzing+taskcluster@mozilla.com",
-    "schedule": ["59 59 11 * * *", "59 59 23 * * *"],
+    "schedule": ["0 0 12 * * *", "0 0 0 * * *"],
     "task": {
         "created": {"$fromNow": "0 seconds"},
         "deadline": {"$fromNow": "1 hour"},
@@ -138,7 +137,9 @@ def test_aws_resources(env, mock_clouds, mock_machines):
             "cloud": "aws",
             "scopes": [],
             "disk_size": "120g",
+            "schedule_start": "1970-01-01T00:00:00Z",
             "cycle_time": "12h",
+            "max_run_time": "12h",
             "cores_per_task": 2,
             "metal": False,
             "name": "Amazing fuzzing pool",
@@ -154,8 +155,7 @@ def test_aws_resources(env, mock_clouds, mock_machines):
             "macros": {},
         },
     )
-    with freeze_time("1970-01-01 00:00:00", tz_offset=0):
-        resources = conf.build_resources(mock_clouds, mock_machines, env=env)
+    resources = conf.build_resources(mock_clouds, mock_machines, env=env)
     assert len(resources) == 3
     pool, hook, role = resources
 
@@ -222,7 +222,9 @@ def test_gcp_resources(env, mock_clouds, mock_machines):
             "cloud": "gcp",
             "scopes": [],
             "disk_size": "120g",
+            "schedule_start": "1970-01-01T00:00:00Z",
             "cycle_time": "12h",
+            "max_run_time": "12h",
             "cores_per_task": 2,
             "metal": False,
             "name": "Amazing fuzzing pool",
@@ -238,8 +240,7 @@ def test_gcp_resources(env, mock_clouds, mock_machines):
             "macros": {},
         },
     )
-    with freeze_time("1970-01-01 00:00:00", tz_offset=0):
-        resources = conf.build_resources(mock_clouds, mock_machines, env=env)
+    resources = conf.build_resources(mock_clouds, mock_machines, env=env)
     assert len(resources) == 3
     pool, hook, role = resources
 
@@ -402,6 +403,8 @@ def test_tasks(env, scope_caps):
             "scopes": scopes,
             "disk_size": "10g",
             "cycle_time": "1h",
+            "max_run_time": "30s",
+            "schedule_start": None,
             "cores_per_task": 1,
             "metal": False,
             "name": "Amazing fuzzing pool",
@@ -487,7 +490,7 @@ def test_tasks(env, scope_caps):
                 "env": expected_env,
                 "features": {"taskclusterProxy": True},
                 "image": "MozillaSecurity/fuzzer:latest",
-                "maxRunTime": 3600,
+                "maxRunTime": 30,
             },
             "priority": "high",
             "provisionerId": "proj-fuzzing",
@@ -604,6 +607,8 @@ def test_flatten(pool_num):
     assert set(pool.scopes) == set(expect.scopes)
     assert pool.disk_size == expect.disk_size
     assert pool.cycle_time == expect.cycle_time
+    assert pool.max_run_time == expect.max_run_time
+    assert pool.schedule_start == expect.schedule_start
     assert pool.cores_per_task == expect.cores_per_task
     assert pool.metal == expect.metal
     assert pool.name == expect.name
@@ -623,10 +628,12 @@ def test_cycle_crons():
     conf = CommonPoolConfiguration(
         "test",
         {
+            "schedule_start": "1970-01-01T00:00:00Z",
             "cloud": "gcp",
             "scopes": [],
             "disk_size": "10g",
             "cycle_time": "6h",
+            "max_run_time": "6h",
             "cores_per_task": 1,
             "metal": False,
             "name": "Amazing fuzzing pool",
@@ -644,7 +651,7 @@ def test_cycle_crons():
     )
 
     # cycle time 6h
-    assert list(conf.cycle_crons(0)) == [
+    assert list(conf.cycle_crons()) == [
         "0 0 6 * * *",
         "0 0 12 * * *",
         "0 0 18 * * *",
@@ -653,32 +660,32 @@ def test_cycle_crons():
 
     # cycle time 3.5 days
     conf.cycle_time = 3600 * 24 * 3.5
-    assert list(conf.cycle_crons(0)) == [
+    assert list(conf.cycle_crons()) == [
         "0 0 12 * * 0",
         "0 0 0 * * 4",
     ]
 
     # cycle time 17h
     conf.cycle_time = 3600 * 17
-    crons = list(conf.cycle_crons(0))
+    crons = list(conf.cycle_crons())
     assert len(crons) == (365 * 24 // 17) + 1
     assert crons[:4] == ["0 0 17 1 1 *", "0 0 10 2 1 *", "0 0 3 3 1 *", "0 0 20 3 1 *"]
 
     # cycle time 48h
     conf.cycle_time = 3600 * 48
-    crons = list(conf.cycle_crons(0))
+    crons = list(conf.cycle_crons())
     assert len(crons) == (365 * 24 // 48) + 1
     assert crons[:4] == ["0 0 0 3 1 *", "0 0 0 5 1 *", "0 0 0 7 1 *", "0 0 0 9 1 *"]
 
     # cycle time 72h
     conf.cycle_time = 3600 * 72
-    crons = list(conf.cycle_crons(0))
+    crons = list(conf.cycle_crons())
     assert len(crons) == (365 * 24 // 72) + 1
     assert crons[:4] == ["0 0 0 4 1 *", "0 0 0 7 1 *", "0 0 0 10 1 *", "0 0 0 13 1 *"]
 
     # cycle time 17d
     conf.cycle_time = 3600 * 24 * 17
-    crons = list(conf.cycle_crons(0))
+    crons = list(conf.cycle_crons())
     assert len(crons) == (365 // 17) + 1
     assert crons[:4] == ["0 0 0 18 1 *", "0 0 0 4 2 *", "0 0 0 21 2 *", "0 0 0 10 3 *"]
 

@@ -10,6 +10,7 @@ import pathlib
 import re
 import types
 
+import dateutil.parser
 import yaml
 
 LOG = logging.getLogger("fuzzing_tc.common.pool")
@@ -26,12 +27,14 @@ FIELD_TYPES = types.MappingProxyType(
         "disk_size": str,
         "imageset": str,
         "macros": dict,
+        "max_run_time": str,
         "metal": bool,
         "minimum_memory_per_core": str,
         "name": str,
         "parents": list,
         "platform": str,
         "preprocess": str,
+        "schedule_start": str,
         "scopes": list,
         "tasks": int,
     }
@@ -116,10 +119,11 @@ class PoolConfiguration:
         container (str): name of the container
         cores_per_task (int): number of cores to be allocated per task
         cpu (int): cpu architecture (eg. x64/arm64)
-        cycle_time (int): maximum run time of this pool in seconds
+        cycle_time (int): schedule for running this pool in seconds
         disk_size (int): disk size in GB
         imageset (str): imageset name in community-tc-config/config/imagesets.yml
         macros (dict): dictionary of environment variables passed to the target
+        max_run_time (int): maximum run time of this pool in seconds
         metal (bool): whether or not the target requires to be run on bare metal
         minimum_memory_per_core (float): minimum RAM to be made available per core in GB
         name (str): descriptive name of the configuration
@@ -127,6 +131,7 @@ class PoolConfiguration:
         platform (str): operating system of the target (linux, windows)
         pool_id (str): basename of the pool on disk (eg. "pool1" for pool1.yml)
         preprocess (str): name of pool configuration to apply and run before fuzzing tasks
+        schedule_start (datetime): reference date for `cycle_time` scheduling
         scopes (list): list of taskcluster scopes required by the target
         tasks (int): number of tasks to run (each with `cores_per_task`)
     """
@@ -193,6 +198,12 @@ class PoolConfiguration:
         self.cycle_time = None
         if data.get("cycle_time") is not None:
             self.cycle_time = int(self.parse_time(data["cycle_time"]))
+        self.max_run_time = None
+        if data.get("max_run_time") is not None:
+            self.max_run_time = int(self.parse_time(data["max_run_time"]))
+        self.schedule_start = None
+        if data.get("schedule_start") is not None:
+            self.schedule_start = dateutil.parser.isoparse(data["schedule_start"])
 
         # other special fields
         self.cpu = None
@@ -218,6 +229,8 @@ class PoolConfiguration:
                 self.command = []
             if self.macros is None:
                 self.macros = {}
+            if self.max_run_time is None:
+                self.max_run_time = self.cycle_time
             if self.parents is None:
                 self.parents = []
             if self.preprocess is None:
@@ -251,6 +264,7 @@ class PoolConfiguration:
             "metal",
             "minimum_memory_per_core",
             "platform",
+            "schedule_start",
         ]
         for field in cannot_set:
             assert data[field] is None, f"{self.preprocess} cannot set {field}"
@@ -269,11 +283,13 @@ class PoolConfiguration:
             "cycle_time",
             "disk_size",
             "imageset",
+            "max_run_time",
             "metal",
             "minimum_memory_per_core",
             "name",
             "platform",
             "preprocess",
+            "schedule_start",
             "tasks",
         )
         merge_dict_fields = ("macros",)
@@ -348,23 +364,20 @@ class PoolConfiguration:
             yielded = True
         assert yielded, "No available machines match specified configuration"
 
-    def cycle_crons(self, start=None):
+    def cycle_crons(self):
         """Generate cron patterns that correspond to cycle_time (starting from now)
 
         Args:
-            start (float): Unix timestamp to offset from (default to now)
+            None
 
         Returns:
             generator of str: One or more strings in simple cron format. If all patterns
                               are installed, the result should correspond to cycle_time.
         """
-        if start is not None:
-            assert isinstance(start, (float, int))
-            now = datetime.datetime.fromtimestamp(start, datetime.timezone.utc)
+        if self.schedule_start is not None:
+            now = self.schedule_start
         else:
-            now = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(
-                seconds=1
-            )
+            now = datetime.datetime.now(datetime.timezone.utc)
         interval = datetime.timedelta(seconds=self.cycle_time)
 
         # special case if the cycle time is a factor of 24 hours

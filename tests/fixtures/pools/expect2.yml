@@ -4,6 +4,8 @@ scopes:
   - scope2
 disk_size: 120g
 cycle_time: 2h
+max_run_time: 2h
+schedule_start: null
 cores_per_task: 10
 metal: false
 name: child

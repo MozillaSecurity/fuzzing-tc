@@ -3,6 +3,8 @@ scopes:
   - scope2
 disk_size: null
 cycle_time: 2h
+max_run_time: 2h
+schedule_start: null
 cores_per_task: null
 metal: null
 name: child

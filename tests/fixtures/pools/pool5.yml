@@ -3,6 +3,8 @@ scopes: []
 disk_size: null
 cycle_time: null
 cores_per_task: null
+max_run_time: null
+schedule_start: null
 metal: null
 name: pool5
 tasks: null

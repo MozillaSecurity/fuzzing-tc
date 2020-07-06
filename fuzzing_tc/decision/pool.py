@@ -4,6 +4,7 @@
 # v. 2.0. If a copy of the MPL was not distributed with this file, You can
 # obtain one at http://mozilla.org/MPL/2.0/.
 
+import math
 from datetime import datetime
 from datetime import timedelta
 
@@ -89,7 +90,9 @@ class PoolConfiguration(CommonPoolConfiguration):
         machines = self.get_machine_list(machine_types)
         config = {
             "minCapacity": 0,
-            "maxCapacity": self.tasks,
+            "maxCapacity": (
+                max(1, math.ceil(self.max_run_time / self.cycle_time)) * self.tasks
+            ),
             "launchConfigs": provider.build_launch_configs(
                 self.imageset, machines, self.disk_size
             ),
@@ -191,7 +194,9 @@ class PoolConfiguration(CommonPoolConfiguration):
                 "taskGroupId": parent_task_id,
                 "dependencies": [parent_task_id],
                 "created": stringDate(now),
-                "deadline": stringDate(now + timedelta(seconds=preprocess.cycle_time)),
+                "deadline": stringDate(
+                    now + timedelta(seconds=preprocess.max_run_time)
+                ),
                 "expires": stringDate(fromNow("1 week", now)),
                 "extra": {},
                 "metadata": {
@@ -217,7 +222,7 @@ class PoolConfiguration(CommonPoolConfiguration):
                     },
                     "features": {"taskclusterProxy": True},
                     "image": preprocess.container,
-                    "maxRunTime": preprocess.cycle_time,
+                    "maxRunTime": preprocess.max_run_time,
                 },
                 "priority": "high",
                 "provisionerId": PROVISIONER_ID,
@@ -242,7 +247,7 @@ class PoolConfiguration(CommonPoolConfiguration):
                 "taskGroupId": parent_task_id,
                 "dependencies": deps,
                 "created": stringDate(now),
-                "deadline": stringDate(now + timedelta(seconds=self.cycle_time)),
+                "deadline": stringDate(now + timedelta(seconds=self.max_run_time)),
                 "expires": stringDate(fromNow("1 week", now)),
                 "extra": {},
                 "metadata": {
@@ -267,7 +272,7 @@ class PoolConfiguration(CommonPoolConfiguration):
                     },
                     "features": {"taskclusterProxy": True},
                     "image": self.container,
-                    "maxRunTime": self.cycle_time,
+                    "maxRunTime": self.max_run_time,
                 },
                 "priority": "high",
                 "provisionerId": PROVISIONER_ID,

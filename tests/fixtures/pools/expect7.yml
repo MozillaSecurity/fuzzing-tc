@@ -5,6 +5,7 @@ scopes:
   - scope4
 disk_size: 120g
 cycle_time: 2h
+max_run_time: 2h
 cores_per_task: 10
 metal: false
 name: pool7

@@ -2,6 +2,8 @@ cloud: gcp
 scopes: []
 disk_size: 10g
 cycle_time: 1h
+max_run_time: 1h
+schedule_start: null
 cores_per_task: 1
 metal: False
 name: Amazing fuzzing pool
