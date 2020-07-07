@@ -267,7 +267,7 @@ class PoolConfiguration:
             "schedule_start",
         ]
         for field in cannot_set:
-            assert data[field] is None, f"{self.preprocess} cannot set {field}"
+            assert data.get(field) is None, f"{self.preprocess} cannot set {field}"
         data["preprocess"] = ""  # blank the preprocess field to avoid inheritance
         data["parents"] = [self.pool_id] + data["parents"]
         data["name"] = f"{self.name} ({data['name']})"
