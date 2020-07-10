@@ -23,6 +23,11 @@ def main():
         help="Taskcluster decision task creating new fuzzing tasks",
         default=os.environ.get("TASK_ID"),
     )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Build the task group, but exit before creating tasks in Taskcluster.",
+    )
     args = parser.parse_args()
 
     # We need both task & task group information
@@ -30,7 +35,7 @@ def main():
         raise Exception("Missing decision task id")
 
     # Setup logger
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(level=args.log_level)
 
     # Configure workflow using the secret or local configuration
     workflow = Workflow()
@@ -45,4 +50,4 @@ def main():
     workflow.clone(config)
 
     # Build all task definitions for that pool
-    workflow.build_tasks(args.pool_name, args.task_id, config)
+    workflow.build_tasks(args.pool_name, args.task_id, config, dry_run=args.dry_run)

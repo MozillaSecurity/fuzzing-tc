@@ -142,7 +142,7 @@ class Workflow(CommonWorkflow):
             rf"Role=hook-id:{HOOK_PREFIX}/{role_suffix}",
         ]
 
-    def build_tasks(self, pool_name, task_id, config):
+    def build_tasks(self, pool_name, task_id, config, dry_run=False):
         path = self.fuzzing_config_dir / f"{pool_name}.yml"
         assert path.exists(), f"Missing pool {pool_name}"
 
@@ -156,11 +156,12 @@ class Workflow(CommonWorkflow):
         pool_config = PoolConfiguration.from_file(path)
         tasks = pool_config.build_tasks(task_id, env)
 
-        # Create all the tasks on taskcluster
-        queue = taskcluster.get_service("queue")
-        for task_id, task in tasks:
-            logger.info(f"Creating task {task['metadata']['name']} as {task_id}")
-            queue.createTask(task_id, task)
+        if not dry_run:
+            # Create all the tasks on taskcluster
+            queue = taskcluster.get_service("queue")
+            for task_id, task in tasks:
+                logger.info(f"Creating task {task['metadata']['name']} as {task_id}")
+                queue.createTask(task_id, task)
 
     def cleanup(self):
         """Cleanup temporary folders at end of execution"""

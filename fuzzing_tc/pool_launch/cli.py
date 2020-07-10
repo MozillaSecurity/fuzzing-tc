@@ -27,11 +27,16 @@ def main(args=None):
         help="Load the pre-process config instead of the normal pool config",
         default=os.environ.get("TASKCLUSTER_FUZZING_PREPROCESS") == "1",
     )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Load the configuration, but exit before executing the command.",
+    )
     parser.add_argument("command", help="docker command-line", nargs=argparse.REMAINDER)
     args = parser.parse_args(args=args)
 
     # Setup logger
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(level=args.log_level)
 
     # Configure workflow using the secret or local configuration
     launcher = PoolLauncher(args.command, args.pool_name, args.preprocess)
@@ -47,5 +52,6 @@ def main(args=None):
         launcher.clone(config)
         launcher.load_params()
 
-    # Build all task definitions for that pool
-    launcher.exec()
+    if not args.dry_run:
+        # Execute command
+        launcher.exec()
