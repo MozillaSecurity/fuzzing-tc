@@ -141,6 +141,7 @@ auth:update-role:hook-id:project-fuzzing/*
 hooks:modify-hook:project-fuzzing/*
 queue:create-task:highest:proj-fuzzing/*
 queue:scheduler-id:-
+queue:cancel-task:-/*
 secrets:get:project/fuzzing/decision
 worker-manager:manage-worker-pool:proj-fuzzing/*
 worker-manager:provider:community-tc-workers-*

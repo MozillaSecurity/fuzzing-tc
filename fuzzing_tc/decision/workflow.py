@@ -19,6 +19,7 @@ from ..common.workflow import Workflow as CommonWorkflow
 from . import HOOK_PREFIX
 from . import WORKER_POOL_PREFIX
 from .pool import PoolConfigLoader
+from .pool import cancel_tasks
 from .providers import AWS
 from .providers import GCP
 
@@ -154,6 +155,10 @@ class Workflow(CommonWorkflow):
 
         # Build tasks needed for a specific pool
         pool_config = PoolConfigLoader.from_file(path)
+
+        # cancel any previously running tasks
+        cancel_tasks(pool_config.task_id)
+
         tasks = pool_config.build_tasks(task_id, env)
 
         if not dry_run:

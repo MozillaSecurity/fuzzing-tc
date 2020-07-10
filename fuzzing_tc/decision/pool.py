@@ -7,6 +7,7 @@
 import itertools
 import logging
 import math
+import os
 from datetime import datetime
 from datetime import timedelta
 
@@ -18,6 +19,7 @@ from tcadmin.resources import Hook
 from tcadmin.resources import Role
 from tcadmin.resources import WorkerPool
 
+from ..common import taskcluster
 from ..common.pool import PoolConfigMap as CommonPoolConfigMap
 from ..common.pool import PoolConfiguration as CommonPoolConfiguration
 from . import DECISION_TASK_SECRET
@@ -57,6 +59,46 @@ def add_capabilities_for_scopes(task):
         del capabilities["devices"]
 
 
+def cancel_tasks(worker_type):
+    # Avoid cancelling self
+    self_task_id = os.getenv("TASK_ID")
+
+    hooks = taskcluster.get_service("hooks")
+    queue = taskcluster.get_service("queue")
+
+    # Get tasks by hook, which may or may not exist yet
+    def iter_tasks_by_hook(hook_id):
+        for fire in hooks.listLastFires(HOOK_PREFIX, hook_id)["lastFires"]:
+            if fire["result"] != "success":
+                continue
+            result = queue.listTaskGroup(fire["taskId"])
+            while result.get("continuationToken"):
+                yield from result["tasks"]
+                result = queue.listTaskGroup(
+                    fire["taskId"],
+                    query={"continuationToken": result["continuationToken"]},
+                )
+            yield from result["tasks"]
+
+    for task in iter_tasks_by_hook(worker_type):
+        task_id = task["status"]["taskId"]
+
+        if task_id == self_task_id:
+            # avoid cancelling self
+            continue
+
+        # State can be pending,running,completed,failed,exception
+        # We only cancel pending & running tasks
+        if any(
+            run["state"] not in {"pending", "running"} for run in task["status"]["runs"]
+        ):
+            # Cancel the task
+            try:
+                queue.cancelTask(task_id)
+            except Exception:
+                LOG.exception(f"Exception calling cancelTask({task_id})")
+
+
 class PoolConfiguration(CommonPoolConfiguration):
     @property
     def task_id(self):
@@ -74,7 +116,10 @@ class PoolConfiguration(CommonPoolConfiguration):
         config = {
             "minCapacity": 0,
             "maxCapacity": (
+                # add +1 to expected size, so if we manually trigger the hook, the new
+                # decision can run without also manually cancelling a task
                 max(1, math.ceil(self.max_run_time / self.cycle_time)) * self.tasks
+                + 1
             ),
             "launchConfigs": provider.build_launch_configs(
                 self.imageset, machines, self.disk_size
@@ -89,6 +134,7 @@ class PoolConfiguration(CommonPoolConfiguration):
         # or create new tasks
         decision_task_scopes = (
             f"queue:scheduler-id:{SCHEDULER_ID}",
+            f"queue:cancel-task:{SCHEDULER_ID}/*",
             f"queue:create-task:highest:{PROVISIONER_ID}/{self.task_id}",
             f"secrets:get:{DECISION_TASK_SECRET}",
         )

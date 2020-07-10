@@ -106,6 +106,7 @@ VALID_HOOK = {
         "schedulerId": "-",
         "scopes": [
             "queue:scheduler-id:-",
+            "queue:cancel-task:-/*",
             "queue:create-task:highest:proj-fuzzing/linux-test",
             "secrets:get:project/fuzzing/decision",
         ],
@@ -122,6 +123,7 @@ VALID_ROLE = {
     "kind": "Role",
     "roleId": "hook-id:project-fuzzing/linux-test",
     "scopes": [
+        "queue:cancel-task:-/*",
         "queue:create-task:highest:proj-fuzzing/linux-test",
         "queue:scheduler-id:-",
         "secrets:get:project/fuzzing/decision",
@@ -196,7 +198,7 @@ def test_aws_resources(env, mock_clouds, mock_machines):
                     },
                 }
             ],
-            "maxCapacity": 3,
+            "maxCapacity": 4,
             "minCapacity": 0,
             "lifecycle": {"registrationTimeout": 900},
         },
@@ -358,7 +360,7 @@ def test_gcp_resources(env, mock_clouds, mock_machines):
                     "zone": "us-west1-a",
                 },
             ],
-            "maxCapacity": 3,
+            "maxCapacity": 4,
             "minCapacity": 0,
             "lifecycle": {"registrationTimeout": 900},
         },
