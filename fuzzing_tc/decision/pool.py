@@ -66,24 +66,34 @@ def cancel_tasks(worker_type):
     hooks = taskcluster.get_service("hooks")
     queue = taskcluster.get_service("queue")
 
-    # Get tasks by hook, which may or may not exist yet
+    # Get tasks by hook
     def iter_tasks_by_hook(hook_id):
         for fire in hooks.listLastFires(HOOK_PREFIX, hook_id)["lastFires"]:
             if fire["result"] != "success":
                 continue
             result = queue.listTaskGroup(fire["taskId"])
             while result.get("continuationToken"):
-                yield from result["tasks"]
+                yield from [
+                    (task, (fire["firedBy"] == "schedule")) for task in result["tasks"]
+                ]
                 result = queue.listTaskGroup(
                     fire["taskId"],
                     query={"continuationToken": result["continuationToken"]},
                 )
-            yield from result["tasks"]
+            yield from [
+                (task, (fire["firedBy"] == "schedule")) for task in result["tasks"]
+            ]
 
-    for task in iter_tasks_by_hook(worker_type):
+    tasks_to_cancel = []
+    for task, scheduled in iter_tasks_by_hook(worker_type):
         task_id = task["status"]["taskId"]
 
         if task_id == self_task_id:
+            if scheduled:
+                # if this decision task was the result of a scheduled hook, don't
+                # cancel anything. if cycle_time is shorter than max_run_time, we
+                # want prior tasks to remain running
+                return
             # avoid cancelling self
             continue
 
@@ -92,11 +102,14 @@ def cancel_tasks(worker_type):
         if any(
             run["state"] not in {"pending", "running"} for run in task["status"]["runs"]
         ):
-            # Cancel the task
-            try:
-                queue.cancelTask(task_id)
-            except Exception:
-                LOG.exception(f"Exception calling cancelTask({task_id})")
+            tasks_to_cancel.append(task_id)
+
+    for task_id in tasks_to_cancel:
+        # Cancel the task
+        try:
+            queue.cancelTask(task_id)
+        except Exception:
+            LOG.exception(f"Exception calling cancelTask({task_id})")
 
 
 class PoolConfiguration(CommonPoolConfiguration):
