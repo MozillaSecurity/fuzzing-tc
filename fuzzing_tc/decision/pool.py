@@ -100,7 +100,7 @@ def cancel_tasks(worker_type):
         # State can be pending,running,completed,failed,exception
         # We only cancel pending & running tasks
         if any(
-            run["state"] not in {"pending", "running"} for run in task["status"]["runs"]
+            run["state"] in {"pending", "running"} for run in task["status"]["runs"]
         ):
             tasks_to_cancel.append(task_id)
 
