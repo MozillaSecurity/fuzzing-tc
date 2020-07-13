@@ -2,10 +2,12 @@
 
 import copy
 from datetime import datetime
+from datetime import timedelta
 from pathlib import Path
 
 import pytest
 import slugid
+from dateutil.tz import UTC
 
 from fuzzing_tc.common.pool import PoolConfiguration as CommonPoolConfiguration
 from fuzzing_tc.decision.pool import DOCKER_WORKER_DEVICES
@@ -688,6 +690,19 @@ def test_cycle_crons():
     crons = list(conf.cycle_crons())
     assert len(crons) == (365 // 17) + 1
     assert crons[:4] == ["0 0 0 18 1 *", "0 0 0 4 2 *", "0 0 0 21 2 *", "0 0 0 10 3 *"]
+
+    # using schedule_start should be the same as using datetime.now()
+    conf.schedule_start = None
+    conf.cycle_time = 3600 * 12
+    start = datetime.now(UTC)
+    calc_none = list(conf.cycle_crons())
+    fin = datetime.now(UTC)
+    for offset in range(int((fin - start).total_seconds()) + 1):
+        conf.schedule_start = start + timedelta(seconds=offset)
+        if calc_none == list(conf.cycle_crons()):
+            break
+    else:
+        assert calc_none == list(conf.cycle_crons())
 
 
 def test_required():

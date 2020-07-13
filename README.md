@@ -8,10 +8,11 @@ A docker image is produced and stored [as Taskcluster artifacts](https://communi
 
 ## Running in production
 
-Two modes of execution are available through the same code base (and Docker image):
+Three modes of execution are available through the same code base (and Docker image):
 
 1. Using `tc-admin` on a CI/CD git workflow of private configuration repositories, to manage resources.
 2. Using `fuzzing-decision` in a Taskcluster hook or task, to bootstrap a fuzzing workflow across several tasks in the same group.
+3. Using `fuzzing-pool-launch` as a Docker image entrypoint, which detects if it is running in a Taskcluster deployment, and if so uses the private fuzzing configuration repository to load a private command-line and environment, as well as redirect stdout/err to a private log artifact.
 
 ### Managing resources
 
