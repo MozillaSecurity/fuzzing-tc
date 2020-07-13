@@ -10,7 +10,7 @@ import os
 import pathlib
 import sys
 
-from ..common.pool import PoolConfiguration
+from ..common.pool import PoolConfigLoader
 from ..common.workflow import Workflow
 
 logger = logging.getLogger()
@@ -25,7 +25,11 @@ class PoolLauncher(Workflow):
 
         self.command = command.copy()
         self.environment = os.environ.copy()
-        self.pool_name = pool_name
+        if "/" in pool_name:
+            self.apply, self.pool_name = pool_name.split("/")
+        else:
+            self.pool_name = pool_name
+            self.apply = None
         self.preprocess = preprocess
         self.log_dir = pathlib.Path("/logs")
 
@@ -41,10 +45,12 @@ class PoolLauncher(Workflow):
         assert path.exists(), f"Missing pool {self.pool_name}"
 
         # Build tasks needed for a specific pool
-        pool_config = PoolConfiguration.from_file(path)
+        pool_config = PoolConfigLoader.from_file(path)
         if self.preprocess:
             pool_config = pool_config.create_preprocess()
             assert pool_config is not None, "preprocess given, but could not be loaded"
+        if self.apply is not None:
+            pool_config = pool_config.apply(self.apply)
 
         if pool_config.command:
             assert not self.command, "Specify command-line args XOR pool.command"

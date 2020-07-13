@@ -9,8 +9,12 @@ import pytest
 import slugid
 from dateutil.tz import UTC
 
+from fuzzing_tc.common.pool import PoolConfigLoader as CommonPoolConfigLoader
+from fuzzing_tc.common.pool import PoolConfigMap as CommonPoolConfigMap
 from fuzzing_tc.common.pool import PoolConfiguration as CommonPoolConfiguration
 from fuzzing_tc.decision.pool import DOCKER_WORKER_DEVICES
+from fuzzing_tc.decision.pool import PoolConfigLoader
+from fuzzing_tc.decision.pool import PoolConfigMap
 from fuzzing_tc.decision.pool import PoolConfiguration
 
 POOL_FIXTURES = Path(__file__).parent / "fixtures" / "pools"
@@ -624,6 +628,71 @@ def test_flatten(pool_num):
     assert pool.platform == expect.platform
     assert pool.preprocess == expect.preprocess
     assert pool.macros == expect.macros
+
+
+def test_pool_map():
+    class PoolConfigNoFlatten(CommonPoolConfiguration):
+        def _flatten(self, _):
+            pass
+
+    cfg_map = CommonPoolConfigMap.from_file(POOL_FIXTURES / "map1.yml")
+    expect = PoolConfigNoFlatten.from_file(POOL_FIXTURES / "expect1.yml")
+    assert cfg_map.cloud == expect.cloud
+    assert set(cfg_map.scopes) == set()
+    assert cfg_map.disk_size == expect.disk_size
+    assert cfg_map.cycle_time == expect.cycle_time
+    assert cfg_map.max_run_time is None
+    assert cfg_map.schedule_start == expect.schedule_start
+    assert cfg_map.cores_per_task == expect.cores_per_task
+    assert cfg_map.metal == expect.metal
+    assert cfg_map.name == "mixed"
+    assert cfg_map.tasks is None
+    assert cfg_map.command is None
+    assert cfg_map.container is None
+    assert cfg_map.minimum_memory_per_core == expect.minimum_memory_per_core
+    assert cfg_map.imageset == expect.imageset
+    assert cfg_map.apply_to == ["pool1"]
+    assert cfg_map.cpu == expect.cpu
+    assert cfg_map.platform == expect.platform
+    assert cfg_map.preprocess is None
+    assert cfg_map.macros == {}
+
+    pools = list(cfg_map.iterpools())
+    assert len(pools) == 1
+    pool = pools[0]
+    assert pool.cloud == expect.cloud
+    assert set(pool.scopes) == set(expect.scopes)
+    assert pool.disk_size == expect.disk_size
+    assert pool.cycle_time == expect.cycle_time
+    assert pool.max_run_time == expect.max_run_time
+    assert pool.schedule_start == expect.schedule_start
+    assert pool.cores_per_task == expect.cores_per_task
+    assert pool.metal == expect.metal
+    assert pool.name == f"{expect.name} ({cfg_map.name})"
+    assert pool.tasks == expect.tasks
+    assert pool.command == expect.command
+    assert pool.container == expect.container
+    assert pool.minimum_memory_per_core == expect.minimum_memory_per_core
+    assert pool.imageset == expect.imageset
+    assert pool.parents == ["pool1"]
+    assert pool.cpu == expect.cpu
+    assert pool.platform == expect.platform
+    assert pool.preprocess == expect.preprocess
+    assert pool.macros == expect.macros
+
+
+@pytest.mark.parametrize(
+    "loader, config_cls, map_cls",
+    [
+        (CommonPoolConfigLoader, CommonPoolConfiguration, CommonPoolConfigMap),
+        (PoolConfigLoader, PoolConfiguration, PoolConfigMap),
+    ],
+)
+def test_pool_loader(loader, config_cls, map_cls):
+    obj = loader.from_file(POOL_FIXTURES / "load-cfg.yml")
+    assert isinstance(obj, config_cls)
+    obj = loader.from_file(POOL_FIXTURES / "load-map.yml")
+    assert isinstance(obj, map_cls)
 
 
 def test_cycle_crons():

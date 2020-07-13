@@ -4,7 +4,9 @@
 # v. 2.0. If a copy of the MPL was not distributed with this file, You can
 # obtain one at http://mozilla.org/MPL/2.0/.
 
+import abc
 import datetime
+import itertools
 import logging
 import pathlib
 import re
@@ -17,7 +19,7 @@ import yaml
 LOG = logging.getLogger("fuzzing_tc.common.pool")
 
 # fields that must exist in pool.yml (once flattened), and their types
-FIELD_TYPES = types.MappingProxyType(
+COMMON_FIELD_TYPES = types.MappingProxyType(
     {
         "cloud": str,
         "command": list,
@@ -32,7 +34,6 @@ FIELD_TYPES = types.MappingProxyType(
         "metal": bool,
         "minimum_memory_per_core": (float, str),
         "name": str,
-        "parents": list,
         "platform": str,
         "preprocess": str,
         "schedule_start": str,
@@ -41,7 +42,14 @@ FIELD_TYPES = types.MappingProxyType(
     }
 )
 # fields that must exist in every pool.yml
-REQUIRED_FIELDS = frozenset(("name",))
+COMMON_REQUIRED_FIELDS = frozenset(("name",))
+POOL_CONFIG_FIELD_TYPES = types.MappingProxyType(
+    {k: v for k, v in itertools.chain(COMMON_FIELD_TYPES.items(), [("parents", list)])}
+)
+POOL_MAP_FIELD_TYPES = types.MappingProxyType(
+    {k: v for k, v in itertools.chain(COMMON_FIELD_TYPES.items(), [("apply_to", list)])}
+)
+POOL_MAP_REQUIRED_FIELDS = frozenset(COMMON_REQUIRED_FIELDS | {"apply_to"})
 CPU_ALIASES = types.MappingProxyType(
     {
         "x86_64": "x64",
@@ -111,7 +119,7 @@ class MachineTypes:
                     yield name
 
 
-class PoolConfiguration:
+class CommonPoolConfiguration(abc.ABC):
     """Fuzzing Pool Configuration
 
     Attributes:
@@ -128,7 +136,6 @@ class PoolConfiguration:
         metal (bool): whether or not the target requires to be run on bare metal
         minimum_memory_per_core (float): minimum RAM to be made available per core in GB
         name (str): descriptive name of the configuration
-        parents (list): list of parents to inherit from
         platform (str): operating system of the target (linux, windows)
         pool_id (str): basename of the pool on disk (eg. "pool1" for pool1.yml)
         preprocess (str): name of pool configuration to apply and run before fuzzing tasks
@@ -137,10 +144,10 @@ class PoolConfiguration:
         tasks (int): number of tasks to run (each with `cores_per_task`)
     """
 
-    def __init__(self, pool_id, data, base_dir=None, _flattened=None):
+    def __init__(self, pool_id, data, base_dir=None):
         LOG.debug(f"creating pool {pool_id}")
-        extra = list(set(data) - set(FIELD_TYPES))
-        missing = list(REQUIRED_FIELDS - set(data))
+        extra = list(set(data) - set(self.FIELD_TYPES))
+        missing = list(set(self.REQUIRED_FIELDS) - set(data))
         assert not missing, f"configuration is missing fields: {missing!r}"
         assert not extra, f"configuration has extra fields: {extra!r}"
 
@@ -149,7 +156,7 @@ class PoolConfiguration:
         self.base_dir = base_dir or pathlib.Path.cwd()
 
         # check that all fields are of the right type (or None)
-        for field, cls in FIELD_TYPES.items():
+        for field, cls in self.FIELD_TYPES.items():
             if data.get(field) is not None:
                 if isinstance(cls, tuple):
                     expected = f"'{cls[0].__name__}' or '{cls[1].__name__}'"
@@ -185,7 +192,6 @@ class PoolConfiguration:
             self.command = data["command"].copy()
         else:
             self.command = None
-        self.parents = data.get("parents", []).copy()
         self.scopes = data.get("scopes", []).copy()
 
         # size fields
@@ -223,129 +229,15 @@ class PoolConfiguration:
             )
             self.cloud = data["cloud"]
 
-        top_level = False
-        if _flattened is None:
-            top_level = True
-            _flattened = {self.pool_id}
-        self._flatten(_flattened)
-        if top_level:
-            # set defaults
-            if self.command is None:
-                self.command = []
-            if self.macros is None:
-                self.macros = {}
-            if self.max_run_time is None:
-                self.max_run_time = self.cycle_time
-            if self.parents is None:
-                self.parents = []
-            if self.preprocess is None:
-                self.preprocess = ""
-            if self.scopes is None:
-                self.scopes = []
-            # assert complete
-            missing = {field for field in FIELD_TYPES if getattr(self, field) is None}
-            missing.discard("schedule_start")  # this field can be null
-            assert not missing, f"Pool is missing fields: {list(missing)!r}"
-
-    def create_preprocess(self):
-        """
-        Return a new PoolConfiguration based on the value of self.preprocess
-        """
-        if not self.preprocess:
-            return None
-        data = yaml.safe_load((self.base_dir / f"{self.preprocess}.yml").read_text())
-        pool_id = self.pool_id + "-preprocess"
-        assert not data["preprocess"], f"{self.preprocess} cannot set preprocess"
-        assert data["tasks"] == 1 or (
-            self.tasks == 1 and data["tasks"] is None
-        ), f"{self.preprocess} must set tasks = 1"
-        cannot_set = [
-            "disk_size",
-            "cores_per_task",
-            "cpu",
-            "cloud",
-            "cycle_time",
-            "imageset",
-            "metal",
-            "minimum_memory_per_core",
-            "platform",
-            "schedule_start",
-        ]
-        for field in cannot_set:
-            assert data.get(field) is None, f"{self.preprocess} cannot set {field}"
-        data["preprocess"] = ""  # blank the preprocess field to avoid inheritance
-        data["parents"] = [self.pool_id] + data["parents"]
-        data["name"] = f"{self.name} ({data['name']})"
-        return type(self)(pool_id, data, self.base_dir)
-
-    def _flatten(self, flattened):
-        overwriting_fields = (
-            "cloud",
-            "command",
-            "container",
-            "cores_per_task",
-            "cpu",
-            "cycle_time",
-            "disk_size",
-            "imageset",
-            "max_run_time",
-            "metal",
-            "minimum_memory_per_core",
-            "name",
-            "platform",
-            "preprocess",
-            "schedule_start",
-            "tasks",
+    @classmethod
+    def from_file(cls, pool_yml, **kwds):
+        assert pool_yml.is_file()
+        return cls(
+            pool_yml.stem,
+            yaml.safe_load(pool_yml.read_text()),
+            base_dir=pool_yml.parent,
+            **kwds,
         )
-        merge_dict_fields = ("macros",)
-        merge_list_fields = ("scopes",)
-        null_fields = {
-            field for field in overwriting_fields if getattr(self, field) is None
-        }
-        # need to update dict values defined in self at the very end
-        my_merge_dict_values = {
-            field: getattr(self, field).copy() for field in merge_dict_fields
-        }
-
-        for parent_id in self.parents:
-            assert (
-                parent_id not in flattened
-            ), f"attempt to resolve cyclic configuration, {parent_id} already encountered"
-            flattened.add(parent_id)
-            parent_obj = self.from_file(self.base_dir / f"{parent_id}.yml", flattened)
-
-            # "normal" overwriting fields
-            for field in overwriting_fields:
-                if field in null_fields:
-                    if getattr(parent_obj, field) is not None:
-                        LOG.debug(
-                            f"overwriting field {field} in {self.pool_id} from {parent_id}"
-                        )
-                    setattr(self, field, getattr(parent_obj, field))
-
-            # merged dict fields
-            for field in merge_dict_fields:
-                if getattr(parent_obj, field):
-                    LOG.debug(
-                        f"merging dict field {field} in {self.pool_id} from {parent_id}"
-                    )
-                getattr(self, field).update(getattr(parent_obj, field))
-
-            # merged list fields
-            for field in merge_list_fields:
-                if getattr(parent_obj, field):
-                    LOG.debug(
-                        f"merging list field {field} in {self.pool_id} from {parent_id}"
-                    )
-                setattr(
-                    self,
-                    field,
-                    list(set(getattr(self, field)) | set(getattr(parent_obj, field))),
-                )
-
-        # dict values defined in self take precedence over values defined in parents
-        for field, values in my_merge_dict_values.items():
-            getattr(self, field).update(values)
 
     def get_machine_list(self, machine_types):
         """
@@ -412,16 +304,6 @@ class PoolConfiguration:
         while now < stop:
             now += interval
             yield f"{now.second} {now.minute} {now.hour} {now.day} {now.month} *"
-
-    @classmethod
-    def from_file(cls, pool_yml, _flattened=None):
-        assert pool_yml.is_file()
-        return cls(
-            pool_yml.stem,
-            yaml.safe_load(pool_yml.read_text()),
-            base_dir=pool_yml.parent,
-            _flattened=_flattened,
-        )
 
     @staticmethod
     def alias_cpu(cpu_name):
@@ -496,6 +378,231 @@ class PoolConfiguration:
             time = match.group(3)
         assert got_anything, "no time could be parsed"
         return result / divisor
+
+
+class PoolConfiguration(CommonPoolConfiguration):
+    """Fuzzing Pool Configuration
+
+    Attributes:
+        parents (list): list of parents to inherit from
+    """
+
+    FIELD_TYPES = POOL_CONFIG_FIELD_TYPES
+    REQUIRED_FIELDS = COMMON_REQUIRED_FIELDS
+
+    def __init__(self, pool_id, data, base_dir=None, _flattened=None):
+        super().__init__(pool_id, data, base_dir)
+
+        # specific fields defined in pool config
+        self.parents = data.get("parents", []).copy()
+
+        top_level = False
+        if _flattened is None:
+            top_level = True
+            _flattened = {self.pool_id}
+        self._flatten(_flattened)
+        if top_level:
+            # set defaults
+            if self.command is None:
+                self.command = []
+            if self.macros is None:
+                self.macros = {}
+            if self.max_run_time is None:
+                self.max_run_time = self.cycle_time
+            if self.parents is None:
+                self.parents = []
+            if self.preprocess is None:
+                self.preprocess = ""
+            if self.scopes is None:
+                self.scopes = []
+            # assert complete
+            missing = {
+                field for field in self.FIELD_TYPES if getattr(self, field) is None
+            }
+            missing.discard("schedule_start")  # this field can be null
+            assert not missing, f"Pool is missing fields: {list(missing)!r}"
+
+    def create_preprocess(self):
+        """
+        Return a new PoolConfiguration based on the value of self.preprocess
+        """
+        if not self.preprocess:
+            return None
+        data = yaml.safe_load((self.base_dir / f"{self.preprocess}.yml").read_text())
+        pool_id = self.pool_id + "/preprocess"
+        assert not data["preprocess"], f"{self.preprocess} cannot set preprocess"
+        assert data["tasks"] == 1 or (
+            self.tasks == 1 and data["tasks"] is None
+        ), f"{self.preprocess} must set tasks = 1"
+        cannot_set = [
+            "disk_size",
+            "cores_per_task",
+            "cpu",
+            "cloud",
+            "cycle_time",
+            "imageset",
+            "metal",
+            "minimum_memory_per_core",
+            "platform",
+            "schedule_start",
+        ]
+        for field in cannot_set:
+            assert data.get(field) is None, f"{self.preprocess} cannot set {field}"
+        data["preprocess"] = ""  # blank the preprocess field to avoid inheritance
+        data["parents"] = [self.pool_id] + data["parents"]
+        data["name"] = f"{self.name} ({data['name']})"
+        return type(self)(pool_id, data, self.base_dir)
+
+    def _flatten(self, flattened):
+        overwriting_fields = (
+            "cloud",
+            "command",
+            "container",
+            "cores_per_task",
+            "cpu",
+            "cycle_time",
+            "disk_size",
+            "imageset",
+            "max_run_time",
+            "metal",
+            "minimum_memory_per_core",
+            "name",
+            "platform",
+            "preprocess",
+            "schedule_start",
+            "tasks",
+        )
+        merge_dict_fields = ("macros",)
+        merge_list_fields = ("scopes",)
+        null_fields = {
+            field for field in overwriting_fields if getattr(self, field) is None
+        }
+        # need to update dict values defined in self at the very end
+        my_merge_dict_values = {
+            field: getattr(self, field).copy() for field in merge_dict_fields
+        }
+
+        for parent_id in self.parents:
+            assert (
+                parent_id not in flattened
+            ), f"attempt to resolve cyclic configuration, {parent_id} already encountered"
+            flattened.add(parent_id)
+            parent_obj = self.from_file(
+                self.base_dir / f"{parent_id}.yml", _flattened=flattened
+            )
+
+            # "normal" overwriting fields
+            for field in overwriting_fields:
+                if field in null_fields:
+                    if getattr(parent_obj, field) is not None:
+                        LOG.debug(
+                            f"overwriting field {field} in {self.pool_id} from {parent_id}"
+                        )
+                    setattr(self, field, getattr(parent_obj, field))
+
+            # merged dict fields
+            for field in merge_dict_fields:
+                if getattr(parent_obj, field):
+                    LOG.debug(
+                        f"merging dict field {field} in {self.pool_id} from {parent_id}"
+                    )
+                getattr(self, field).update(getattr(parent_obj, field))
+
+            # merged list fields
+            for field in merge_list_fields:
+                if getattr(parent_obj, field):
+                    LOG.debug(
+                        f"merging list field {field} in {self.pool_id} from {parent_id}"
+                    )
+                setattr(
+                    self,
+                    field,
+                    list(set(getattr(self, field)) | set(getattr(parent_obj, field))),
+                )
+
+        # dict values defined in self take precedence over values defined in parents
+        for field, values in my_merge_dict_values.items():
+            getattr(self, field).update(values)
+
+
+class PoolConfigMap(CommonPoolConfiguration):
+    """
+    A pool map is a pool config that has no `parents`, but instead has a list of `apply_to`.
+
+    For each pool config in `apply_to`, the map will be applied as though it were a child of that config.
+    """
+
+    FIELD_TYPES = POOL_MAP_FIELD_TYPES
+    REQUIRED_FIELDS = POOL_MAP_REQUIRED_FIELDS
+    RESULT_TYPE = PoolConfiguration
+
+    def __init__(self, pool_id, data, base_dir=None):
+        super().__init__(pool_id, data, base_dir)
+
+        # specific fields defined in pool config
+        self.apply_to = data["apply_to"].copy()
+
+        # while these fields are not required to be defined here, they must be the same for the entire set
+        # .. at least for now
+        same_fields = (
+            "cloud",
+            "cores_per_task",
+            "cpu",
+            "cycle_time",
+            "disk_size",
+            "imageset",
+            "metal",
+            "minimum_memory_per_core",
+            "platform",
+            "schedule_start",
+        )
+        not_allowed = ("preprocess",)
+        pools = list(self.iterpools())
+        for field in same_fields:
+            assert (
+                len({getattr(pool, field) for pool in pools}) == 1
+            ), f"{field} has multiple values"
+            # set the field on self, so it can easily be used by decision
+            setattr(self, field, getattr(pools[0], field))
+        for field in not_allowed:
+            assert not any(
+                getattr(pool, field) for pool in pools
+            ), f"{field} cannot be defined"
+
+    def apply(self, parent):
+        pool_id = f"{parent}/{self.pool_id}"
+        data = {k: getattr(self, k, None) for k in COMMON_FIELD_TYPES}
+        # convert special fields
+        for gig_field in ("disk_size", "minimum_memory_per_core"):
+            if data[gig_field] is not None:
+                data[gig_field] *= 1024 * 1024 * 1024
+        if data["schedule_start"] is not None:
+            data["schedule_start"] = data["schedule_start"].isoformat()
+        # override fields
+        data["parents"] = [parent]
+        name = self.RESULT_TYPE.from_file(self.base_dir / f"{parent}.yml").name
+        data["name"] = f"{name} ({self.name})"
+        return self.RESULT_TYPE(pool_id, data, self.base_dir)
+
+    def iterpools(self):
+        for parent in self.apply_to:
+            yield self.apply(parent)
+
+
+class PoolConfigLoader:
+    @staticmethod
+    def from_file(pool_yml):
+        assert pool_yml.is_file()
+        data = yaml.safe_load(pool_yml.read_text())
+        for cls in (PoolConfiguration, PoolConfigMap):
+            if set(cls.FIELD_TYPES) >= set(data.keys()) >= cls.REQUIRED_FIELDS:
+                return cls(pool_yml.stem, data, base_dir=pool_yml.parent)
+        LOG.error(
+            f"{pool_yml} has keys {data.keys()} and expected all of either "
+            f"{PoolConfiguration.REQUIRED_FIELDS} or {PoolConfigMap.REQUIRED_FIELDS} to "
+            f"exist."
+        )
+        raise RuntimeError(f"{pool_yml} type could not be identified!")
 
 
 def test_main():

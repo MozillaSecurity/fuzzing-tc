@@ -18,7 +18,7 @@ from ..common.pool import MachineTypes
 from ..common.workflow import Workflow as CommonWorkflow
 from . import HOOK_PREFIX
 from . import WORKER_POOL_PREFIX
-from .pool import PoolConfiguration
+from .pool import PoolConfigLoader
 from .providers import AWS
 from .providers import GCP
 
@@ -98,7 +98,7 @@ class Workflow(CommonWorkflow):
 
         # Browse the files in the repo
         for config_file in self.fuzzing_config_dir.glob("pool*.yml"):
-            pool_config = PoolConfiguration.from_file(config_file)
+            pool_config = PoolConfigLoader.from_file(config_file)
             resources.update(pool_config.build_resources(clouds, machines, env))
 
     def build_resources_patterns(self):
@@ -153,7 +153,7 @@ class Workflow(CommonWorkflow):
             env["FUZZING_GIT_REVISION"] = config["fuzzing_config"]["revision"]
 
         # Build tasks needed for a specific pool
-        pool_config = PoolConfiguration.from_file(path)
+        pool_config = PoolConfigLoader.from_file(path)
         tasks = pool_config.build_tasks(task_id, env)
 
         if not dry_run:
