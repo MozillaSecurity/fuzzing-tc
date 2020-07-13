@@ -11,6 +11,7 @@ import re
 import types
 
 import dateutil.parser
+import dateutil.tz
 import yaml
 
 LOG = logging.getLogger("fuzzing_tc.common.pool")
@@ -23,13 +24,13 @@ FIELD_TYPES = types.MappingProxyType(
         "container": str,
         "cores_per_task": int,
         "cpu": str,
-        "cycle_time": str,
-        "disk_size": str,
+        "cycle_time": (int, str),
+        "disk_size": (int, str),
         "imageset": str,
         "macros": dict,
-        "max_run_time": str,
+        "max_run_time": (int, str),
         "metal": bool,
-        "minimum_memory_per_core": str,
+        "minimum_memory_per_core": (float, str),
         "name": str,
         "parents": list,
         "platform": str,
@@ -150,16 +151,20 @@ class PoolConfiguration:
         # check that all fields are of the right type (or None)
         for field, cls in FIELD_TYPES.items():
             if data.get(field) is not None:
+                if isinstance(cls, tuple):
+                    expected = f"'{cls[0].__name__}' or '{cls[1].__name__}'"
+                else:
+                    expected = f"'{cls.__name__}'"
                 assert isinstance(
                     data[field], cls
-                ), f"expected '{field}' to be '{cls.__name__}', got '{type(data[field]).__name__}'"
+                ), f"expected '{field}' to be {expected}, got '{type(data[field]).__name__}'"
         for key, value in data.get("macros", {}).items():
             assert isinstance(
                 key, str
             ), f"expected macro '{key!r}' name to be 'str', got '{type(key).__name__}'"
             assert isinstance(
-                value, str
-            ), f"expected macro '{key}' value to be 'str', got '{type(value).__name__}'"
+                value, (int, str)
+            ), f"expected macro '{key}' value to be 'int' or 'str', got '{type(value).__name__}'"
 
         self.container = data.get("container")
         self.cores_per_task = data.get("cores_per_task")
@@ -172,7 +177,7 @@ class PoolConfiguration:
         self.preprocess = data.get("preprocess")
 
         # dict fields
-        self.macros = data.get("macros", {}).copy()
+        self.macros = {k: str(v) for k, v in data.get("macros", {}).items()}
 
         # list fields
         # command is an overwriting field, null is allowed
@@ -187,20 +192,20 @@ class PoolConfiguration:
         self.minimum_memory_per_core = self.disk_size = None
         if data.get("minimum_memory_per_core") is not None:
             self.minimum_memory_per_core = self.parse_size(
-                data["minimum_memory_per_core"], self.parse_size("1g")
+                str(data["minimum_memory_per_core"]), self.parse_size("1g")
             )
         if data.get("disk_size") is not None:
             self.disk_size = int(
-                self.parse_size(data["disk_size"], self.parse_size("1g"))
+                self.parse_size(str(data["disk_size"]), self.parse_size("1g"))
             )
 
         # time fields
         self.cycle_time = None
         if data.get("cycle_time") is not None:
-            self.cycle_time = int(self.parse_time(data["cycle_time"]))
+            self.cycle_time = int(self.parse_time(str(data["cycle_time"])))
         self.max_run_time = None
         if data.get("max_run_time") is not None:
-            self.max_run_time = int(self.parse_time(data["max_run_time"]))
+            self.max_run_time = int(self.parse_time(str(data["max_run_time"])))
         self.schedule_start = None
         if data.get("schedule_start") is not None:
             self.schedule_start = dateutil.parser.isoparse(data["schedule_start"])
@@ -376,6 +381,8 @@ class PoolConfiguration:
         """
         if self.schedule_start is not None:
             now = self.schedule_start
+            if now.utcoffset() is not None:
+                now = now.astimezone(dateutil.tz.UTC)
         else:
             now = datetime.datetime.now(datetime.timezone.utc)
         interval = datetime.timedelta(seconds=self.cycle_time)
@@ -470,10 +477,8 @@ class PoolConfiguration:
         while time:
             match = re.match(r"\s*(\d+)\s*([wdhms]?)\s*(.*)", time, re.IGNORECASE)
             assert (
-                got_anything or match is not None
+                match is not None
             ), "time should be a number followed by optional unit"
-            if match is None:
-                break
             if match.group(2):
                 multiplier = {
                     "w": 7 * 24 * 60 * 60,
@@ -489,6 +494,7 @@ class PoolConfiguration:
             got_anything = True
             result += int(match.group(1)) * multiplier
             time = match.group(3)
+        assert got_anything, "no time could be parsed"
         return result / divisor
 
 
