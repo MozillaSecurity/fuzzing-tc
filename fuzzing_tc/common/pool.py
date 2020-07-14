@@ -433,7 +433,6 @@ class PoolConfiguration(CommonPoolConfiguration):
             return None
         data = yaml.safe_load((self.base_dir / f"{self.preprocess}.yml").read_text())
         pool_id = self.pool_id + "/preprocess"
-        assert not data["preprocess"], f"{self.preprocess} cannot set preprocess"
         assert data["tasks"] == 1 or (
             self.tasks == 1 and data["tasks"] is None
         ), f"{self.preprocess} must set tasks = 1"
@@ -447,14 +446,16 @@ class PoolConfiguration(CommonPoolConfiguration):
             "metal",
             "minimum_memory_per_core",
             "platform",
+            "preprocess",
             "schedule_start",
         ]
         for field in cannot_set:
             assert data.get(field) is None, f"{self.preprocess} cannot set {field}"
         data["preprocess"] = ""  # blank the preprocess field to avoid inheritance
         data["parents"] = [self.pool_id] + data["parents"]
-        data["name"] = f"{self.name} ({data['name']})"
-        return type(self)(pool_id, data, self.base_dir)
+        result = type(self)(pool_id, data, self.base_dir)
+        result.name = f"{self.name} ({result.name})"
+        return result
 
     def _flatten(self, flattened):
         overwriting_fields = (
