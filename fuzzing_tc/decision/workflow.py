@@ -157,7 +157,8 @@ class Workflow(CommonWorkflow):
         pool_config = PoolConfigLoader.from_file(path)
 
         # cancel any previously running tasks
-        cancel_tasks(pool_config.task_id)
+        if not dry_run:
+            cancel_tasks(pool_config.task_id)
 
         tasks = pool_config.build_tasks(task_id, env)
 
