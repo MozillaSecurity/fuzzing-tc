@@ -1,13 +1,11 @@
 # -*- coding: utf-8 -*-
 
 import copy
-from datetime import datetime
-from datetime import timedelta
+import datetime
 from pathlib import Path
 
 import pytest
 import slugid
-from dateutil.tz import UTC
 
 from fuzzing_tc.common.pool import PoolConfigLoader as CommonPoolConfigLoader
 from fuzzing_tc.common.pool import PoolConfigMap as CommonPoolConfigMap
@@ -445,7 +443,7 @@ def test_tasks(env, scope_caps):
             assert isinstance(obj, dict)
             value = obj[key]
         assert isinstance(value, str)
-        date = datetime.strptime(value, "%Y-%m-%dT%H:%M:%S.%fZ")
+        date = datetime.datetime.strptime(value, "%Y-%m-%dT%H:%M:%S.%fZ")
         del obj[key]
         return date
 
@@ -531,7 +529,7 @@ def test_preprocess_tasks():
             assert isinstance(obj, dict)
             value = obj[key]
         assert isinstance(value, str)
-        date = datetime.strptime(value, "%Y-%m-%dT%H:%M:%S.%fZ")
+        date = datetime.datetime.strptime(value, "%Y-%m-%dT%H:%M:%S.%fZ")
         del obj[key]
         return date
 
@@ -763,11 +761,11 @@ def test_cycle_crons():
     # using schedule_start should be the same as using datetime.now()
     conf.schedule_start = None
     conf.cycle_time = 3600 * 12
-    start = datetime.now(UTC)
+    start = datetime.datetime.now(datetime.timezone.utc)
     calc_none = list(conf.cycle_crons())
-    fin = datetime.now(UTC)
+    fin = datetime.datetime.now(datetime.timezone.utc)
     for offset in range(int((fin - start).total_seconds()) + 1):
-        conf.schedule_start = start + timedelta(seconds=offset)
+        conf.schedule_start = start + datetime.timedelta(seconds=offset)
         if calc_none == list(conf.cycle_crons()):
             break
     else:

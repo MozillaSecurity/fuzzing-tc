@@ -13,7 +13,6 @@ import re
 import types
 
 import dateutil.parser
-import dateutil.tz
 import yaml
 
 LOG = logging.getLogger("fuzzing_tc.common.pool")
@@ -273,8 +272,12 @@ class CommonPoolConfiguration(abc.ABC):
         """
         if self.schedule_start is not None:
             now = self.schedule_start
-            if now.utcoffset() is not None:
-                now = now.astimezone(dateutil.tz.UTC)
+            if now.utcoffset() is None:
+                # no timezone was specified. treat it as UTC
+                now = now.replace(tzinfo=datetime.timezone.utc)
+            else:
+                # timezone was given, shift the datetime to be equivalent but in UTC
+                now = now.astimezone(datetime.timezone.utc)
         else:
             now = datetime.datetime.now(datetime.timezone.utc)
         interval = datetime.timedelta(seconds=self.cycle_time)
