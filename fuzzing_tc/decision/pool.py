@@ -249,11 +249,17 @@ class PoolConfiguration(CommonPoolConfiguration):
                 },
                 "payload": {
                     "artifacts": {
-                        "project/fuzzing/private/logs": {
+                        tc_key: {
                             "expires": stringDate(fromNow("1 week", now)),
-                            "path": "/logs/",
-                            "type": "directory",
+                            "path": local_path,
+                            "type": (
+                                "directory" if local_path.endswith("/") else "file"
+                            ),
                         }
+                        for local_path, tc_key in itertools.chain(
+                            preprocess.artifacts.items(),
+                            [("/logs/", "project/fuzzing/private/logs")],
+                        )
                     },
                     "cache": {},
                     "capabilities": {},
@@ -300,11 +306,17 @@ class PoolConfiguration(CommonPoolConfiguration):
                 },
                 "payload": {
                     "artifacts": {
-                        "project/fuzzing/private/logs": {
+                        tc_key: {
                             "expires": stringDate(fromNow("1 week", now)),
-                            "path": "/logs/",
-                            "type": "directory",
+                            "path": local_path,
+                            "type": (
+                                "directory" if local_path.endswith("/") else "file"
+                            ),
                         }
+                        for local_path, tc_key in itertools.chain(
+                            self.artifacts.items(),
+                            [("/logs/", "project/fuzzing/private/logs")],
+                        )
                     },
                     "cache": {},
                     "capabilities": {},

@@ -20,6 +20,7 @@ LOG = logging.getLogger("fuzzing_tc.common.pool")
 # fields that must exist in pool.yml (once flattened), and their types
 COMMON_FIELD_TYPES = types.MappingProxyType(
     {
+        "artifacts": dict,
         "cloud": str,
         "command": list,
         "container": str,
@@ -122,6 +123,7 @@ class CommonPoolConfiguration(abc.ABC):
     """Fuzzing Pool Configuration
 
     Attributes:
+        artifacts (dict): dictionary of local path -> taskcluster path
         cloud (str): cloud provider, like aws or gcp
         command (list): list of strings, command to execute in the image/container
         container (str): name of the container
@@ -164,6 +166,15 @@ class CommonPoolConfiguration(abc.ABC):
                 assert isinstance(
                     data[field], cls
                 ), f"expected '{field}' to be {expected}, got '{type(data[field]).__name__}'"
+        for key, value in data.get("artifacts", {}).items():
+            assert isinstance(key, str), (
+                f"expected artifact '{key!r}' name to be 'str', "
+                f"got '{type(key).__name__}'"
+            )
+            assert isinstance(value, str), (
+                f"expected artifact '{key}' value to be 'str', "
+                f"got '{type(value).__name__}'"
+            )
         for key, value in data.get("macros", {}).items():
             assert isinstance(
                 key, str
@@ -183,6 +194,7 @@ class CommonPoolConfiguration(abc.ABC):
         self.preprocess = data.get("preprocess")
 
         # dict fields
+        self.artifacts = data.get("artifacts", {})
         self.macros = {k: str(v) for k, v in data.get("macros", {}).items()}
 
         # list fields
@@ -406,6 +418,8 @@ class PoolConfiguration(CommonPoolConfiguration):
         self._flatten(_flattened)
         if top_level:
             # set defaults
+            if self.artifacts is None:
+                self.artifacts = {}
             if self.command is None:
                 self.command = []
             if self.macros is None:
@@ -476,7 +490,7 @@ class PoolConfiguration(CommonPoolConfiguration):
             "schedule_start",
             "tasks",
         )
-        merge_dict_fields = ("macros",)
+        merge_dict_fields = ("artifacts", "macros")
         merge_list_fields = ("scopes",)
         null_fields = {
             field for field in overwriting_fields if getattr(self, field) is None

@@ -424,6 +424,10 @@ def test_tasks(env, scope_caps):
             "platform": "linux",
             "preprocess": None,
             "macros": {},
+            "artifacts": {
+                "/some-file.txt": "project/fuzzing/private/file.txt",
+                "/var/log/": "project/fuzzing/private/var-log",
+            },
         },
     )
 
@@ -465,6 +469,14 @@ def test_tasks(env, scope_caps):
             task, "payload", "artifacts", "project/fuzzing/private/logs", "expires"
         )
         assert log_expires == expires
+        log_expires = _check_date(
+            task, "payload", "artifacts", "project/fuzzing/private/file.txt", "expires"
+        )
+        assert log_expires == expires
+        log_expires = _check_date(
+            task, "payload", "artifacts", "project/fuzzing/private/var-log", "expires"
+        )
+        assert log_expires == expires
         assert set(task["scopes"]) == set(
             ["secrets:get:project/fuzzing/decision"] + scopes
         )
@@ -489,7 +501,15 @@ def test_tasks(env, scope_caps):
                     "project/fuzzing/private/logs": {
                         "path": "/logs/",
                         "type": "directory",
-                    }
+                    },
+                    "project/fuzzing/private/file.txt": {
+                        "path": "/some-file.txt",
+                        "type": "file",
+                    },
+                    "project/fuzzing/private/var-log": {
+                        "path": "/var/log/",
+                        "type": "directory",
+                    },
                 },
                 "cache": {},
                 "capabilities": expected_capabilities,
