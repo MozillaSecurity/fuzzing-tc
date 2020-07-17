@@ -226,11 +226,13 @@ class PoolConfiguration(CommonPoolConfiguration):
 
     def artifact_map(self, expires):
         result = {}
-        for local_path, tc_key in self.artifacts.items():
-            result[tc_key] = {
+        for local_path, value in self.artifacts.items():
+            assert isinstance(value["url"], str)
+            assert value["type"] in {"directory", "file"}
+            result[value["url"]] = {
                 "expires": expires,
                 "path": local_path,
-                "type": "directory" if local_path.endswith("/") else "file",
+                "type": value["type"],
             }
         # this artifact is required by pool_launch
         result["project/fuzzing/private/logs"] = {

@@ -123,7 +123,7 @@ class CommonPoolConfiguration(abc.ABC):
     """Fuzzing Pool Configuration
 
     Attributes:
-        artifacts (dict): dictionary of local path -> taskcluster path
+        artifacts (dict): dictionary of local path -> {url: taskcluster path, type: file/directory}
         cloud (str): cloud provider, like aws or gcp
         command (list): list of strings, command to execute in the image/container
         container (str): name of the container
@@ -171,10 +171,22 @@ class CommonPoolConfiguration(abc.ABC):
                 f"expected artifact '{key!r}' name to be 'str', "
                 f"got '{type(key).__name__}'"
             )
-            assert isinstance(value, str), (
-                f"expected artifact '{key}' value to be 'str', "
+            assert isinstance(value, dict), (
+                f"expected artifact '{key}' value to be 'dict', "
                 f"got '{type(value).__name__}'"
             )
+            assert set(value.keys()) == {
+                "url",
+                "type",
+            }, f"expected artifact '{key}' object to contain only keys: url, type"
+            assert isinstance(value["url"], str), (
+                f"expected artifact '{key}' .url to be 'str', "
+                f"got '{type(value['url']).__name__}'"
+            )
+            assert value["type"] in {
+                "file",
+                "directory",
+            }, f"expected artifact '{key}' .type to be one of: file, directory"
         for key, value in data.get("macros", {}).items():
             assert isinstance(
                 key, str

@@ -425,8 +425,14 @@ def test_tasks(env, scope_caps):
             "preprocess": None,
             "macros": {},
             "artifacts": {
-                "/some-file.txt": "project/fuzzing/private/file.txt",
-                "/var/log/": "project/fuzzing/private/var-log",
+                "/some-file.txt": {
+                    "type": "file",
+                    "url": "project/fuzzing/private/file.txt",
+                },
+                "/var/log/": {
+                    "type": "directory",
+                    "url": "project/fuzzing/private/var-log",
+                },
             },
         },
     )
