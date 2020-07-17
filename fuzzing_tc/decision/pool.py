@@ -224,6 +224,22 @@ class PoolConfiguration(CommonPoolConfiguration):
 
         return [pool, hook, role]
 
+    def artifact_map(self, expires):
+        result = {}
+        for local_path, tc_key in self.artifacts.items():
+            result[tc_key] = {
+                "expires": expires,
+                "path": local_path,
+                "type": "directory" if local_path.endswith("/") else "file",
+            }
+        # this artifact is required by pool_launch
+        result["project/fuzzing/private/logs"] = {
+            "expires": expires,
+            "path": "/logs/",
+            "type": "directory",
+        }
+        return result
+
     def build_tasks(self, parent_task_id, env=None):
         """Create fuzzing tasks and attach them to a decision task"""
         now = datetime.utcnow()
@@ -248,19 +264,9 @@ class PoolConfiguration(CommonPoolConfiguration):
                     "source": "https://github.com/MozillaSecurity/fuzzing-tc",
                 },
                 "payload": {
-                    "artifacts": {
-                        tc_key: {
-                            "expires": stringDate(fromNow("1 week", now)),
-                            "path": local_path,
-                            "type": (
-                                "directory" if local_path.endswith("/") else "file"
-                            ),
-                        }
-                        for local_path, tc_key in itertools.chain(
-                            preprocess.artifacts.items(),
-                            [("/logs/", "project/fuzzing/private/logs")],
-                        )
-                    },
+                    "artifacts": preprocess.artifact_map(
+                        stringDate(fromNow("1 week", now))
+                    ),
                     "cache": {},
                     "capabilities": {},
                     "env": {
@@ -305,19 +311,7 @@ class PoolConfiguration(CommonPoolConfiguration):
                     "source": "https://github.com/MozillaSecurity/fuzzing-tc",
                 },
                 "payload": {
-                    "artifacts": {
-                        tc_key: {
-                            "expires": stringDate(fromNow("1 week", now)),
-                            "path": local_path,
-                            "type": (
-                                "directory" if local_path.endswith("/") else "file"
-                            ),
-                        }
-                        for local_path, tc_key in itertools.chain(
-                            self.artifacts.items(),
-                            [("/logs/", "project/fuzzing/private/logs")],
-                        )
-                    },
+                    "artifacts": self.artifact_map(stringDate(fromNow("1 week", now))),
                     "cache": {},
                     "capabilities": {},
                     "env": {
