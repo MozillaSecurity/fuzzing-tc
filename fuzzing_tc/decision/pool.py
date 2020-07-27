@@ -12,6 +12,7 @@ from datetime import datetime
 from datetime import timedelta
 
 import yaml
+from taskcluster.exceptions import TaskclusterRestFailure
 from taskcluster.utils import fromNow
 from taskcluster.utils import slugId
 from taskcluster.utils import stringDate
@@ -68,21 +69,27 @@ def cancel_tasks(worker_type):
 
     # Get tasks by hook
     def iter_tasks_by_hook(hook_id):
-        for fire in hooks.listLastFires(HOOK_PREFIX, hook_id)["lastFires"]:
-            if fire["result"] != "success":
-                continue
-            result = queue.listTaskGroup(fire["taskId"])
-            while result.get("continuationToken"):
+        try:
+            for fire in hooks.listLastFires(HOOK_PREFIX, hook_id)["lastFires"]:
+                if fire["result"] != "success":
+                    continue
+                result = queue.listTaskGroup(fire["taskId"])
+                while result.get("continuationToken"):
+                    yield from [
+                        (task, (fire["firedBy"] == "schedule"))
+                        for task in result["tasks"]
+                    ]
+                    result = queue.listTaskGroup(
+                        fire["taskId"],
+                        query={"continuationToken": result["continuationToken"]},
+                    )
                 yield from [
                     (task, (fire["firedBy"] == "schedule")) for task in result["tasks"]
                 ]
-                result = queue.listTaskGroup(
-                    fire["taskId"],
-                    query={"continuationToken": result["continuationToken"]},
-                )
-            yield from [
-                (task, (fire["firedBy"] == "schedule")) for task in result["tasks"]
-            ]
+        except TaskclusterRestFailure as msg:
+            if "No such hook" in str(msg):
+                return
+            raise
 
     tasks_to_cancel = []
     for task, scheduled in iter_tasks_by_hook(worker_type):
