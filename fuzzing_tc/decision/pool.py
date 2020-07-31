@@ -100,6 +100,7 @@ def cancel_tasks(worker_type):
                 # if this decision task was the result of a scheduled hook, don't
                 # cancel anything. if cycle_time is shorter than max_run_time, we
                 # want prior tasks to remain running
+                LOG.info(f"{self_task_id} is scheduled, not cancelling tasks")
                 return
             # avoid cancelling self
             continue
@@ -110,10 +111,12 @@ def cancel_tasks(worker_type):
             run["state"] in {"pending", "running"} for run in task["status"]["runs"]
         ):
             tasks_to_cancel.append(task_id)
+    LOG.info(f"{self_task_id} is cancelling {len(tasks_to_cancel)} tasks")
 
     for task_id in tasks_to_cancel:
         # Cancel the task
         try:
+            LOG.warning(f"=> cancelling: {task_id}")
             queue.cancelTask(task_id)
         except Exception:
             LOG.exception(f"Exception calling cancelTask({task_id})")
