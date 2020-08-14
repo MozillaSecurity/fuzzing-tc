@@ -12,6 +12,7 @@ from datetime import datetime
 from datetime import timedelta
 
 import yaml
+from taskcluster.exceptions import TaskclusterFailure
 from taskcluster.exceptions import TaskclusterRestFailure
 from taskcluster.utils import fromNow
 from taskcluster.utils import slugId
@@ -73,7 +74,12 @@ def cancel_tasks(worker_type):
             for fire in hooks.listLastFires(HOOK_PREFIX, hook_id)["lastFires"]:
                 if fire["result"] != "success":
                     continue
-                result = queue.listTaskGroup(fire["taskId"])
+                try:
+                    result = queue.listTaskGroup(fire["taskId"])
+                except TaskclusterFailure as exc:
+                    if "No task-group with taskGroupId" in str(exc):
+                        continue
+                    raise
                 while result.get("continuationToken"):
                     yield from [
                         (task, (fire["firedBy"] == "schedule"))
