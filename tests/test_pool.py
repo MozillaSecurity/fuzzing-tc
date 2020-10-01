@@ -10,6 +10,7 @@ import slugid
 from fuzzing_tc.common.pool import PoolConfigLoader as CommonPoolConfigLoader
 from fuzzing_tc.common.pool import PoolConfigMap as CommonPoolConfigMap
 from fuzzing_tc.common.pool import PoolConfiguration as CommonPoolConfiguration
+from fuzzing_tc.common.pool import parse_size
 from fuzzing_tc.decision.pool import DOCKER_WORKER_DEVICES
 from fuzzing_tc.decision.pool import PoolConfigLoader
 from fuzzing_tc.decision.pool import PoolConfigMap
@@ -29,9 +30,9 @@ POOL_FIXTURES = Path(__file__).parent / "fixtures" / "pools"
 )
 def test_parse_size(size, divisor, result):
     if isinstance(divisor, str):
-        divisor = PoolConfiguration.parse_size(divisor)
+        divisor = parse_size(divisor)
 
-    assert PoolConfiguration.parse_size(size, divisor) == result
+    assert parse_size(size) / divisor == result
 
 
 @pytest.mark.parametrize(

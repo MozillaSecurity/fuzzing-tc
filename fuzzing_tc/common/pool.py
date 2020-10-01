@@ -64,6 +64,61 @@ PROVIDERS = frozenset(("aws", "gcp"))
 ARCHITECTURES = frozenset(("x64", "arm64"))
 
 
+def parse_size(size):
+    """Parse a human readable size like "4g" into (4 * 1024 * 1024 * 1024)
+
+    Args:
+        size (str): size as a string, with si prefixes allowed
+
+    Returns:
+        float: size with si prefix expanded
+    """
+    match = re.match(r"\s*(\d+\.\d*|\.\d+|\d+)\s*([kmgt]?)b?\s*", size, re.IGNORECASE)
+    assert match is not None, "size should be a number followed by optional si prefix"
+    result = float(match.group(1))
+    multiplier = {
+        "": 1,
+        "k": 1024,
+        "m": 1024 * 1024,
+        "g": 1024 * 1024 * 1024,
+        "t": 1024 * 1024 * 1024 * 1024,
+    }[match.group(2).lower()]
+    return result * multiplier
+
+
+def parse_time(time):
+    """Parse a human readable time like 1h30m or 30m10s
+
+    Args:
+        time (str): time as a string
+
+    Returns:
+        float: time in seconds
+    """
+    result = 0
+    got_anything = False
+    while time:
+        match = re.match(r"\s*(\d+)\s*([wdhms]?)\s*(.*)", time, re.IGNORECASE)
+        assert match is not None, "time should be a number followed by optional unit"
+        if match.group(2):
+            multiplier = {
+                "w": 7 * 24 * 60 * 60,
+                "d": 24 * 60 * 60,
+                "h": 60 * 60,
+                "m": 60,
+                "s": 1,
+            }[match.group(2).lower()]
+        else:
+            assert not match.group(3), "trailing data"
+            assert not got_anything, "multipart time must specify all units"
+            multiplier = 1
+        got_anything = True
+        result += int(match.group(1)) * multiplier
+        time = match.group(3)
+    assert got_anything, "no time could be parsed"
+    return result
+
+
 class MachineTypes:
     """Database of all machine types available, by provider and architecture.
     """
@@ -220,21 +275,19 @@ class CommonPoolConfiguration(abc.ABC):
         # size fields
         self.minimum_memory_per_core = self.disk_size = None
         if data.get("minimum_memory_per_core") is not None:
-            self.minimum_memory_per_core = self.parse_size(
-                str(data["minimum_memory_per_core"]), self.parse_size("1g")
-            )
+            self.minimum_memory_per_core = parse_size(
+                str(data["minimum_memory_per_core"])
+            ) / parse_size("1g")
         if data.get("disk_size") is not None:
-            self.disk_size = int(
-                self.parse_size(str(data["disk_size"]), self.parse_size("1g"))
-            )
+            self.disk_size = int(parse_size(str(data["disk_size"])) / parse_size("1g"))
 
         # time fields
         self.cycle_time = None
         if data.get("cycle_time") is not None:
-            self.cycle_time = int(self.parse_time(str(data["cycle_time"])))
+            self.cycle_time = int(parse_time(str(data["cycle_time"])))
         self.max_run_time = None
         if data.get("max_run_time") is not None:
-            self.max_run_time = int(self.parse_time(str(data["max_run_time"])))
+            self.max_run_time = int(parse_time(str(data["max_run_time"])))
         self.schedule_start = None
         if data.get("schedule_start") is not None:
             if isinstance(data["schedule_start"], datetime.datetime):
@@ -345,69 +398,6 @@ class CommonPoolConfiguration(abc.ABC):
             str: x64 or arm64
         """
         return CPU_ALIASES[cpu_name.lower()]
-
-    @staticmethod
-    def parse_size(size, divisor=1):
-        """Parse a human readable size like "4g" into (4 * 1024 * 1024 * 1024)
-
-        Args:
-            size (str): size as a string, with si prefixes allowed
-            divisor (int): unit to divide by (eg. 1024 for result in kb)
-
-        Returns:
-            float: size with si prefix expanded and divisor applied
-        """
-        match = re.match(
-            r"\s*(\d+\.\d*|\.\d+|\d+)\s*([kmgt]?)b?\s*", size, re.IGNORECASE
-        )
-        assert (
-            match is not None
-        ), "size should be a number followed by optional si prefix"
-        result = float(match.group(1))
-        multiplier = {
-            "": 1,
-            "k": 1024,
-            "m": 1024 * 1024,
-            "g": 1024 * 1024 * 1024,
-            "t": 1024 * 1024 * 1024 * 1024,
-        }[match.group(2).lower()]
-        return result * multiplier / divisor
-
-    @staticmethod
-    def parse_time(time, divisor=1):
-        """Parse a human readable time like 1h30m or 30m10s
-
-        Args:
-            time (str): time as a string
-            divisor (int): seconds to divide by (1s default, 60 for result in minutes, etc.)
-
-        Returns:
-            float: time in seconds (or units determined by divisor)
-        """
-        result = 0
-        got_anything = False
-        while time:
-            match = re.match(r"\s*(\d+)\s*([wdhms]?)\s*(.*)", time, re.IGNORECASE)
-            assert (
-                match is not None
-            ), "time should be a number followed by optional unit"
-            if match.group(2):
-                multiplier = {
-                    "w": 7 * 24 * 60 * 60,
-                    "d": 24 * 60 * 60,
-                    "h": 60 * 60,
-                    "m": 60,
-                    "s": 1,
-                }[match.group(2).lower()]
-            else:
-                assert not match.group(3), "trailing data"
-                assert not got_anything, "multipart time must specify all units"
-                multiplier = 1
-            got_anything = True
-            result += int(match.group(1)) * multiplier
-            time = match.group(3)
-        assert got_anything, "no time could be parsed"
-        return result / divisor
 
 
 class PoolConfiguration(CommonPoolConfiguration):
@@ -658,7 +648,7 @@ def test_main():
     parser.add_argument("--metal", help="bare metal machines", action="store_true")
     args = parser.parse_args()
 
-    ram = PoolConfiguration.parse_size(args.ram, PoolConfiguration.parse_size("1g"))
+    ram = parse_size(args.ram) / parse_size("1g")
     type_list = MachineTypes.from_file(args.input)
     for machine in type_list.filter(
         args.provider, args.cpu, args.cores, ram, args.metal

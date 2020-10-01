@@ -24,6 +24,7 @@ from tcadmin.resources import WorkerPool
 from ..common import taskcluster
 from ..common.pool import PoolConfigMap as CommonPoolConfigMap
 from ..common.pool import PoolConfiguration as CommonPoolConfiguration
+from ..common.pool import parse_time
 from . import DECISION_TASK_SECRET
 from . import HOOK_PREFIX
 from . import OWNER_EMAIL
@@ -155,8 +156,8 @@ class PoolConfiguration(CommonPoolConfiguration):
             ),
             "lifecycle": {
                 # give workers 15 minutes to register before assuming they're broken
-                "registrationTimeout": 900,
-                "reregistrationTimeout": 345600,
+                "registrationTimeout": int(parse_time("15m")),
+                "reregistrationTimeout": int(parse_time("4d")),
             },
         }
 
@@ -193,7 +194,7 @@ class PoolConfiguration(CommonPoolConfiguration):
                     "namespace": "project.fuzzing.config.master",
                 },
                 "command": ["fuzzing-decision", self.pool_id],
-                "maxRunTime": 3600,
+                "maxRunTime": int(parse_time("1h")),
             },
             "priority": "high",
             "provisionerId": PROVISIONER_ID,
@@ -387,8 +388,8 @@ class PoolConfigMap(CommonPoolConfigMap):
             ),
             "lifecycle": {
                 # give workers 15 minutes to register before assuming they're broken
-                "registrationTimeout": 900,
-                "reregistrationTimeout": 345600,
+                "registrationTimeout": int(parse_time("15m")),
+                "reregistrationTimeout": int(parse_time("4d")),
             },
         }
 
@@ -424,7 +425,7 @@ class PoolConfigMap(CommonPoolConfigMap):
                     "namespace": "project.fuzzing.config.master",
                 },
                 "command": ["fuzzing-decision", self.pool_id],
-                "maxRunTime": 3600,
+                "maxRunTime": int(parse_time("1h")),
             },
             "priority": "high",
             "provisionerId": PROVISIONER_ID,
