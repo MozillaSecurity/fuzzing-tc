@@ -156,8 +156,8 @@ class PoolConfiguration(CommonPoolConfiguration):
             ),
             "lifecycle": {
                 # give workers 15 minutes to register before assuming they're broken
-                "registrationTimeout": int(parse_time("15m")),
-                "reregistrationTimeout": int(parse_time("4d")),
+                "registrationTimeout": parse_time("15m"),
+                "reregistrationTimeout": parse_time("4d"),
             },
         }
 
@@ -194,7 +194,7 @@ class PoolConfiguration(CommonPoolConfiguration):
                     "namespace": "project.fuzzing.config.master",
                 },
                 "command": ["fuzzing-decision", self.pool_id],
-                "maxRunTime": int(parse_time("1h")),
+                "maxRunTime": parse_time("1h"),
             },
             "priority": "high",
             "provisionerId": PROVISIONER_ID,
@@ -388,8 +388,8 @@ class PoolConfigMap(CommonPoolConfigMap):
             ),
             "lifecycle": {
                 # give workers 15 minutes to register before assuming they're broken
-                "registrationTimeout": int(parse_time("15m")),
-                "reregistrationTimeout": int(parse_time("4d")),
+                "registrationTimeout": parse_time("15m"),
+                "reregistrationTimeout": parse_time("4d"),
             },
         }
 
@@ -425,7 +425,7 @@ class PoolConfigMap(CommonPoolConfigMap):
                     "namespace": "project.fuzzing.config.master",
                 },
                 "command": ["fuzzing-decision", self.pool_id],
-                "maxRunTime": int(parse_time("1h")),
+                "maxRunTime": parse_time("1h"),
             },
             "priority": "high",
             "provisionerId": PROVISIONER_ID,

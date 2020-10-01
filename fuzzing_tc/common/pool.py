@@ -93,7 +93,7 @@ def parse_time(time):
         time (str): time as a string
 
     Returns:
-        float: time in seconds
+        int: time in seconds
     """
     result = 0
     got_anything = False
@@ -284,10 +284,10 @@ class CommonPoolConfiguration(abc.ABC):
         # time fields
         self.cycle_time = None
         if data.get("cycle_time") is not None:
-            self.cycle_time = int(parse_time(str(data["cycle_time"])))
+            self.cycle_time = parse_time(str(data["cycle_time"]))
         self.max_run_time = None
         if data.get("max_run_time") is not None:
-            self.max_run_time = int(parse_time(str(data["max_run_time"])))
+            self.max_run_time = parse_time(str(data["max_run_time"]))
         self.schedule_start = None
         if data.get("schedule_start") is not None:
             if isinstance(data["schedule_start"], datetime.datetime):
