@@ -381,7 +381,7 @@ class PoolConfigMap(CommonPoolConfigMap):
         machines = self.get_machine_list(machine_types)
         config = {
             "minCapacity": 0,
-            "maxCapacity": sum(pool.tasks for pool in pools) + 1,
+            "maxCapacity": max(sum(pool.tasks for pool in pools) * 2, 3),
             "launchConfigs": provider.build_launch_configs(
                 self.imageset, machines, self.disk_size
             ),
