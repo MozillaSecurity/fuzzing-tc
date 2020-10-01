@@ -36,7 +36,7 @@ COMMON_FIELD_TYPES = types.MappingProxyType(
         "name": str,
         "platform": str,
         "preprocess": str,
-        "schedule_start": str,
+        "schedule_start": (datetime.datetime, str),
         "scopes": list,
         "tasks": int,
     }
@@ -237,7 +237,10 @@ class CommonPoolConfiguration(abc.ABC):
             self.max_run_time = int(self.parse_time(str(data["max_run_time"])))
         self.schedule_start = None
         if data.get("schedule_start") is not None:
-            self.schedule_start = dateutil.parser.isoparse(data["schedule_start"])
+            if isinstance(data["schedule_start"], datetime.datetime):
+                self.schedule_start = data["schedule_start"]
+            else:
+                self.schedule_start = dateutil.parser.isoparse(data["schedule_start"])
 
         # other special fields
         self.cpu = None

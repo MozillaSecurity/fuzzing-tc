@@ -627,7 +627,7 @@ def test_preprocess_tasks():
         }
 
 
-@pytest.mark.parametrize("pool_num", range(1, 8))
+@pytest.mark.parametrize("pool_num", range(1, 9))
 def test_flatten(pool_num):
     class PoolConfigNoFlatten(CommonPoolConfiguration):
         def _flatten(self, _):
