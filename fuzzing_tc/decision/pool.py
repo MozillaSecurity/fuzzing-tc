@@ -148,7 +148,9 @@ class PoolConfiguration(CommonPoolConfiguration):
             "maxCapacity": (
                 # add +1 to expected size, so if we manually trigger the hook, the new
                 # decision can run without also manually cancelling a task
-                max(1, math.ceil(self.max_run_time / self.cycle_time)) * self.tasks
+                # * 2 since Taskcluster seems to not reuse workers very quickly in some cases,
+                # so we end up with a lot of pending tasks.
+                max(1, math.ceil(self.max_run_time / self.cycle_time)) * self.tasks * 2
                 + 1
             ),
             "launchConfigs": provider.build_launch_configs(
