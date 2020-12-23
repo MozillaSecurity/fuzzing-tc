@@ -121,8 +121,7 @@ def parse_time(time):
 
 
 class MachineTypes:
-    """Database of all machine types available, by provider and architecture.
-    """
+    """Database of all machine types available, by provider and architecture."""
 
     def __init__(self, machines_data):
         for provider, provider_archs in machines_data.items():

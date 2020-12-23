@@ -17,8 +17,7 @@ logger = logging.getLogger()
 
 
 class PoolLauncher(Workflow):
-    """Launcher for a fuzzing pool, using docker parameters from a private repo.
-    """
+    """Launcher for a fuzzing pool, using docker parameters from a private repo."""
 
     def __init__(self, command, pool_name, preprocess=False):
         super().__init__()

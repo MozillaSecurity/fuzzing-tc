@@ -49,5 +49,8 @@ appconfig.callbacks.add(
     resources=[WorkerPool],
 )
 appconfig.callbacks.add(
-    "after_apply", trigger_hook, actions=["create", "update"], resources=[Hook],
+    "after_apply",
+    trigger_hook,
+    actions=["create", "update"],
+    resources=[Hook],
 )
