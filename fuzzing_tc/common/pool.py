@@ -5,14 +5,15 @@
 # obtain one at http://mozilla.org/MPL/2.0/.
 
 import abc
-import datetime
 import itertools
 import logging
 import pathlib
 import re
 import types
+from datetime import datetime
+from datetime import timedelta
+from datetime import timezone
 
-import dateutil.parser
 import yaml
 
 LOG = logging.getLogger("fuzzing_tc.common.pool")
@@ -36,7 +37,7 @@ COMMON_FIELD_TYPES = types.MappingProxyType(
         "name": str,
         "platform": str,
         "preprocess": str,
-        "schedule_start": (datetime.datetime, str),
+        "schedule_start": (datetime, str),
         "scopes": list,
         "tasks": int,
     }
@@ -290,10 +291,12 @@ class CommonPoolConfiguration(abc.ABC):
             self.max_run_time = parse_time(str(data["max_run_time"]))
         self.schedule_start = None
         if data.get("schedule_start") is not None:
-            if isinstance(data["schedule_start"], datetime.datetime):
+            if isinstance(data["schedule_start"], datetime):
                 self.schedule_start = data["schedule_start"]
             else:
-                self.schedule_start = dateutil.parser.isoparse(data["schedule_start"])
+                self.schedule_start = datetime.fromisoformat(
+                    data["schedule_start"].replace("Z", "+00:00")
+                )
 
         # other special fields
         self.cpu = None
@@ -354,17 +357,17 @@ class CommonPoolConfiguration(abc.ABC):
             now = self.schedule_start
             if now.utcoffset() is None:
                 # no timezone was specified. treat it as UTC
-                now = now.replace(tzinfo=datetime.timezone.utc)
+                now = now.replace(tzinfo=timezone.utc)
             else:
                 # timezone was given, shift the datetime to be equivalent but in UTC
-                now = now.astimezone(datetime.timezone.utc)
+                now = now.astimezone(timezone.utc)
         else:
-            now = datetime.datetime.now(datetime.timezone.utc)
-        interval = datetime.timedelta(seconds=self.cycle_time)
+            now = datetime.now(timezone.utc)
+        interval = timedelta(seconds=self.cycle_time)
 
         # special case if the cycle time is a factor of 24 hours
         if (24 * 60 * 60) % self.cycle_time == 0:
-            stop = now + datetime.timedelta(days=1)
+            stop = now + timedelta(days=1)
             while now < stop:
                 now += interval
                 yield f"{now.second} {now.minute} {now.hour} * * *"
@@ -372,7 +375,7 @@ class CommonPoolConfiguration(abc.ABC):
 
         # special case if the cycle time is a factor of 7 days
         if (7 * 24 * 60 * 60) % self.cycle_time == 0:
-            stop = now + datetime.timedelta(days=7)
+            stop = now + timedelta(days=7)
             while now < stop:
                 now += interval
                 weekday = now.isoweekday() % 7
@@ -383,7 +386,7 @@ class CommonPoolConfiguration(abc.ABC):
         #   awkward to represent in cron format: resort to generating an annual schedule
         # the cycle will glitch if it really runs for the full year, and either have
         #   dead time or overlapping runs, happening once around the anniversary.
-        stop = now + datetime.timedelta(days=365)
+        stop = now + timedelta(days=365)
         while now < stop:
             now += interval
             yield f"{now.second} {now.minute} {now.hour} {now.day} {now.month} *"
