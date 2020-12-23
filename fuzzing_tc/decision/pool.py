@@ -159,7 +159,7 @@ class PoolConfiguration(CommonPoolConfiguration):
             "lifecycle": {
                 # give workers 15 minutes to register before assuming they're broken
                 "registrationTimeout": parse_time("15m"),
-                "reregistrationTimeout": parse_time("1h"),
+                "reregistrationTimeout": parse_time("12h"),
             },
         }
 
@@ -391,7 +391,7 @@ class PoolConfigMap(CommonPoolConfigMap):
             "lifecycle": {
                 # give workers 15 minutes to register before assuming they're broken
                 "registrationTimeout": parse_time("15m"),
-                "reregistrationTimeout": parse_time("1h"),
+                "reregistrationTimeout": parse_time("12h"),
             },
         }
 
