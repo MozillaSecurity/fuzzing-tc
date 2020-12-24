@@ -14,6 +14,7 @@ from datetime import datetime
 from datetime import timedelta
 from datetime import timezone
 
+import dateutil.parser
 import yaml
 
 LOG = logging.getLogger("fuzzing_tc.common.pool")
@@ -293,9 +294,7 @@ class CommonPoolConfiguration(abc.ABC):
             if isinstance(data["schedule_start"], datetime):
                 self.schedule_start = data["schedule_start"]
             else:
-                self.schedule_start = datetime.fromisoformat(
-                    data["schedule_start"].replace("Z", "+00:00")
-                )
+                self.schedule_start = dateutil.parser.isoparse(data["schedule_start"])
 
         # other special fields
         self.cpu = None

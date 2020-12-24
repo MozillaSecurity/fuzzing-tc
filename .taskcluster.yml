@@ -37,7 +37,7 @@ tasks:
       workerType: ci
       payload:
         maxRunTime: 1200
-        image: python:3.7
+        image: python:3.8
         command:
           - /bin/bash
           - -cxe
@@ -62,7 +62,7 @@ tasks:
       workerType: ci
       payload:
         maxRunTime: 1200
-        image: python:3.7
+        image: python:3.8
         command:
           - /bin/bash
           - -cxe
