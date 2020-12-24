@@ -199,7 +199,7 @@ def test_aws_resources(env, mock_clouds, mock_machines):
                     },
                 }
             ],
-            "maxCapacity": 4,
+            "maxCapacity": 7,
             "minCapacity": 0,
             "lifecycle": {"registrationTimeout": 900, "reregistrationTimeout": 43200},
         },
@@ -361,7 +361,7 @@ def test_gcp_resources(env, mock_clouds, mock_machines):
                     "zone": "us-west1-a",
                 },
             ],
-            "maxCapacity": 4,
+            "maxCapacity": 7,
             "minCapacity": 0,
             "lifecycle": {"registrationTimeout": 900, "reregistrationTimeout": 43200},
         },
@@ -628,14 +628,15 @@ def test_preprocess_tasks():
         }
 
 
-@pytest.mark.parametrize("pool_num", range(1, 9))
-def test_flatten(pool_num):
+@pytest.mark.parametrize("pool_path", POOL_FIXTURES.glob("pool*.yml"))
+def test_flatten(pool_path):
     class PoolConfigNoFlatten(CommonPoolConfiguration):
         def _flatten(self, _):
             pass
 
-    pool = CommonPoolConfiguration.from_file(POOL_FIXTURES / f"pool{pool_num}.yml")
-    expect = PoolConfigNoFlatten.from_file(POOL_FIXTURES / f"expect{pool_num}.yml")
+    pool = CommonPoolConfiguration.from_file(pool_path)
+    expect_path = pool_path.with_name(pool_path.name.replace("pool", "expect"))
+    expect = PoolConfigNoFlatten.from_file(expect_path)
     assert pool.cloud == expect.cloud
     assert set(pool.scopes) == set(expect.scopes)
     assert pool.disk_size == expect.disk_size

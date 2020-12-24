@@ -25,7 +25,7 @@ COMMON_FIELD_TYPES = types.MappingProxyType(
         "artifacts": dict,
         "cloud": str,
         "command": list,
-        "container": str,
+        "container": (str, dict),
         "cores_per_task": int,
         "cpu": str,
         "cycle_time": (int, str),
@@ -182,7 +182,8 @@ class CommonPoolConfiguration(abc.ABC):
         artifacts (dict): dictionary of local path -> {url: taskcluster path, type: file/directory}
         cloud (str): cloud provider, like aws or gcp
         command (list): list of strings, command to execute in the image/container
-        container (str): name of the container
+        container (str/dict): image to run. takes the same options as
+            https://docs.taskcluster.net/docs/reference/workers/docker-worker/payload
         cores_per_task (int): number of cores to be allocated per task
         cpu (int): cpu architecture (eg. x64/arm64)
         cycle_time (int): schedule for running this pool in seconds
@@ -222,6 +223,32 @@ class CommonPoolConfiguration(abc.ABC):
                 assert isinstance(
                     data[field], cls
                 ), f"expected '{field}' to be {expected}, got '{type(data[field]).__name__}'"
+        if isinstance(data.get("container"), dict):
+            value = data["container"]
+            assert "type" in value, "'container' missing required key: 'type'"
+            assert value["type"] in {
+                "docker-image",
+                "indexed-image",
+                "task-image",
+            }, f"unknown 'container.type': {value['type']}"
+            required_keys = {
+                "docker-image": {"type", "name"},
+                "indexed-image": {"type", "path", "namespace"},
+                "task-image": {"type", "path", "taskId"},
+            }[value["type"]]
+            have_keys = set(value.keys())
+            missing_keys = required_keys - have_keys
+            extra_keys = have_keys - required_keys
+            assert (
+                not missing_keys
+            ), f"missing required keys for 'container' with type '{value['type']}': {', '.join(missing_keys)}"
+            assert (
+                not extra_keys
+            ), f"unknown keys for 'container' with type '{value['type']}': {', '.join(extra_keys)}"
+            for k, v in value.items():
+                assert isinstance(
+                    v, str
+                ), f"unexpected type for 'container.{k}': {type(v).__name__}"
         for key, value in data.get("artifacts", {}).items():
             assert isinstance(key, str), (
                 f"expected artifact '{key!r}' name to be 'str', "
