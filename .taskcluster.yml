@@ -3,6 +3,24 @@ policy:
   pullRequests: public
 tasks:
   $let:
+    user: ${event.sender.login}
+
+    fetch_rev:
+      $if: 'tasks_for == "github-pull-request"'
+      then: ${event.pull_request.head.sha}
+      else:
+        $if: 'tasks_for == "github-push"'
+        then: ${event.after}
+        else: ${event.release.tag_name}
+
+    fetch_ref:
+      $if: 'tasks_for == "github-pull-request"'
+      then: "pull/${event.number}/head"
+      else:
+        $if: 'tasks_for == "github-push"'
+        then: ${event.ref}
+        else: "tags/${event.release.tag_name}"
+
     head_branch:
       $if: 'tasks_for == "github-pull-request"'
       then: ${event.pull_request.head.ref}
@@ -15,116 +33,94 @@ tasks:
           else: ${event.ref}
         else: ${event.release.target_commitish}
 
-    head_rev:
+    http_repo:
       $if: 'tasks_for == "github-pull-request"'
-      then: ${event.pull_request.head.sha}
-      else:
-        $if: 'tasks_for == "github-push"'
-        then: ${event.after}
-        else: ${event.release.tag_name}
-
-    repository:
-      $if: 'tasks_for == "github-pull-request"'
-      then: ${event.pull_request.head.repo.html_url}
-      else: ${event.repository.html_url}
+      then: ${event.pull_request.base.repo.clone_url}
+      else: ${event.repository.clone_url}
 
     taskboot_image: "mozilla/taskboot:0.2.2"
   in:
-    - taskId: {$eval: as_slugid("decision_lint")}
-      created: {$fromNow: ''}
-      deadline: {$fromNow: '1 hour'}
-      provisionerId: proj-fuzzing
-      workerType: ci
-      payload:
-        maxRunTime: 1200
-        image: python:3.8
-        command:
-          - /bin/bash
-          - -cxe
-          - |
-            apt-get update -qq
-            apt-get install --no-install-recommends -qq git > /dev/null
-            git clone --quiet ${repository} /src
-            cd /src
-            git -c advice.detachedHead=false checkout ${head_rev}
-            pip install --disable-pip-version-check --no-cache-dir --quiet tox
-            tox -e lint
-      metadata:
-        name: Fuzzing Taskcluster decision lint
-        description: Check that the source code from Decision task source code is nice & clean
-        owner: fuzzing+taskcluster@mozilla.com
-        source: https://github.com/MozillaSecurity/fuzzing-tc
-
-    - taskId: {$eval: as_slugid("decision_tests")}
-      created: {$fromNow: ''}
-      deadline: {$fromNow: '1 hour'}
-      provisionerId: proj-fuzzing
-      workerType: ci
-      payload:
-        maxRunTime: 1200
-        image: python:3.8
-        command:
-          - /bin/bash
-          - -cxe
-          - |
-            apt-get update -qq
-            apt-get install --no-install-recommends -qq git > /dev/null
-            git clone --quiet ${repository} /src
-            cd /src
-            git -c advice.detachedHead=false checkout ${head_rev}
-            pip install --disable-pip-version-check --no-cache-dir --quiet tox
-            TOX_SKIP_ENV=lint tox
-      metadata:
-        name: Fuzzing Taskcluster decision unit tests
-        description: Check that the unit tests from Decision tasks are valid
-        owner: fuzzing+taskcluster@mozilla.com
-        source: https://github.com/MozillaSecurity/fuzzing-tc
-
-    - taskId: {$eval: as_slugid("decision_build")}
-      created: {$fromNow: ''}
-      deadline: {$fromNow: '1 hour'}
-      provisionerId: proj-fuzzing
-      workerType: ci
-      dependencies:
-        - {$eval: as_slugid("decision_lint")}
-        - {$eval: as_slugid("decision_tests")}
-      payload:
-        features:
-          dind: true
-        maxRunTime: 3600
-        image: "${taskboot_image}"
-        env:
-          GIT_REPOSITORY: ${repository}
-          GIT_REVISION: ${head_rev}
-        command:
-          - taskboot
-          - build
-          - --build-tool
-          - dind
-          - --image
-          - mozillasecurity/fuzzing-tc
-          - --tag
-          - "latest"
-          - --tag
-          - "${head_rev}"
-          - --write
-          - /decision.tar
-          - Dockerfile
-        artifacts:
-          public/fuzzing-tc-decision.tar:
-            expires: {$fromNow: '6 months'}
-            path: /decision.tar
-            type: file
-      routes:
-        - "index.project.fuzzing.config.rev.${head_rev}"
-        - $if: 'tasks_for == "github-pull-request"'
-          then: "index.project.fuzzing.config.pull_request.${head_branch}"
-          else: "index.project.fuzzing.config.${head_branch}"
-      scopes:
-        - docker-worker:capability:privileged
-        - queue:route:index.project.fuzzing.config.*
-      metadata:
-        name: Fuzzing Taskcluster decision docker build
-        description: Build the docker image for decision tasks
-        owner: fuzzing+taskcluster@mozilla.com
-        source: https://github.com/MozillaSecurity/fuzzing-tc
+    $flatten:
+      - $map:
+        - {image: ci-py-36, toxenv: 'py36', name: 'tests python 3.6'}
+        - {image: ci-py-37, toxenv: 'py37', name: 'tests python 3.7'}
+        - {image: ci-py-38, toxenv: 'py38', name: 'tests python 3.8'}
+        - {image: ci-py-38, toxenv: 'lint', name: 'lint'}
+        each(build):
+          taskId: {$eval: as_slugid(build.toxenv)}
+          provisionerId: proj-fuzzing
+          workerType: ci
+          created: {$fromNow: ''}
+          deadline: {$fromNow: '1 hour'}
+          payload:
+            maxRunTime: 1200
+            image: mozillasecurity/${build.image}:latest
+            features:
+              taskclusterProxy: true
+            command:
+              - /bin/bash
+              - '--login'
+              - '-x'
+              - '-c'
+              - >-
+                retry () { for _ in {1..9}; do "$@" && return || sleep 30; done; "$@"; }  &&
+                git init repo &&
+                cd repo &&
+                git remote add origin ${http_repo} &&
+                retry git fetch -q --depth=1 origin "${fetch_ref}" &&
+                git -c advice.detachedHead=false checkout ${fetch_rev} &&
+                tox -e ${build.toxenv}
+          metadata:
+            name: Fuzzing Taskcluster Decision ${build.name}
+            description: Fuzzing Taskcluster Decision ${build.name}
+            owner: '${user}@users.noreply.github.com'
+            source: ${http_repo}/raw/${fetch_rev}/.taskcluster.yml
+      - - provisionerId: proj-fuzzing
+          workerType: ci
+          dependencies:
+            - {$eval: as_slugid("py36")}
+            - {$eval: as_slugid("py37")}
+            - {$eval: as_slugid("py38")}
+            - {$eval: as_slugid("lint")}
+          created: {$fromNow: ''}
+          deadline: {$fromNow: '1 hour'}
+          payload:
+            features:
+              dind: true
+            maxRunTime: 3600
+            image: "${taskboot_image}"
+            env:
+              GIT_REPOSITORY: ${http_repo}
+              GIT_REVISION: ${fetch_rev}
+            command:
+              - taskboot
+              - build
+              - --build-tool
+              - dind
+              - --image
+              - mozillasecurity/fuzzing-tc
+              - --tag
+              - "latest"
+              - --tag
+              - "${fetch_rev}"
+              - --write
+              - /decision.tar
+              - Dockerfile
+            artifacts:
+              public/fuzzing-tc-decision.tar:
+                expires: {$fromNow: '6 months'}
+                path: /decision.tar
+                type: file
+          routes:
+            - "index.project.fuzzing.config.rev.${fetch_rev}"
+            - $if: 'tasks_for == "github-pull-request"'
+              then: "index.project.fuzzing.config.pull_request.${head_branch}"
+              else: "index.project.fuzzing.config.${head_branch}"
+          scopes:
+            - docker-worker:capability:privileged
+            - queue:route:index.project.fuzzing.config.*
+          metadata:
+            name: Fuzzing Taskcluster Decision Docker build
+            description: Build the Docker image for fuzzing decision tasks
+            owner: '${user}@users.noreply.github.com'
+            source: ${http_repo}/raw/${fetch_rev}/.taskcluster.yml
