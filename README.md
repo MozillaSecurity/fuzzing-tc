@@ -1,5 +1,7 @@
 # Fuzzing automated deployment on Taskcluster
 
+**Note**: This project was merged into https://github.com/MozillaSecurity/orion/tree/master/services/fuzzing-decision.  This copy is for historical reference only.
+
 This Python 3 project manages Taskcluster resources and their deployment using public [community configuration](https://github.com/mozilla/community-tc-config/) & private fuzzing configuration.
 
 It uses [tc-admin](https://github.com/taskcluster/tc-admin) to allow admins to easily update those resources using a Git workflow.
